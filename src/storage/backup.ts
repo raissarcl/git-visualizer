@@ -9,8 +9,8 @@ import { loadNotes, saveNotes } from './notes'
 import { loadPins, savePins } from './pins'
 import { SIDEBAR_COLLAPSED_KEY, saveSidebarCollapsed } from './preferences'
 import {
-  emptyLayout,
   loadRepoLayout,
+  normalizeLayout,
   saveRepoLayout,
   type RepoLayout,
 } from './repoLayout'
@@ -52,17 +52,7 @@ function parsePins(raw: unknown): string[] {
 }
 
 function parseLayout(raw: unknown): RepoLayout {
-  if (!isRecord(raw)) return emptyLayout()
-  return {
-    folders: Array.isArray(raw.folders) ? (raw.folders as RepoLayout['folders']) : [],
-    folderByRepo:
-      raw.folderByRepo && typeof raw.folderByRepo === 'object' && !Array.isArray(raw.folderByRepo)
-        ? (raw.folderByRepo as RepoLayout['folderByRepo'])
-        : {},
-    hidden: Array.isArray(raw.hidden)
-      ? raw.hidden.filter((h): h is string => typeof h === 'string')
-      : [],
-  }
+  return normalizeLayout(raw)
 }
 
 export function buildLocalBackup(): LocalBackupPayload {

@@ -7,34 +7,103 @@ const LAYOUT_KEY = 'gh_repo_layout'
 export interface RepoFolder {
   id: string
   name: string
+  /** null = raiz */
+  parentId: string | null
   collapsed?: boolean
 }
 
 export interface RepoLayout {
   folders: RepoFolder[]
-  /** repo full name -> folderId; missing/null = uncategorized */
-  folderByRepo: Record<string, string | null>
+  /** repo full name → pastas (várias permitidas); ausente/[] = sem pasta */
+  foldersByRepo: Record<string, string[]>
   /** repos hidden from sidebar */
   hidden: string[]
 }
 
 export function emptyLayout(): RepoLayout {
-  return { folders: [], folderByRepo: {}, hidden: [] }
+  return { folders: [], foldersByRepo: {}, hidden: [] }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value)
+}
+
+function normalizeFolders(raw: unknown): RepoFolder[] {
+  if (!Array.isArray(raw)) return []
+
+  return raw
+    .filter((item): item is Record<string, unknown> => isRecord(item))
+    .filter((item) => typeof item.id === 'string' && typeof item.name === 'string')
+    .map((item) => ({
+      id: item.id as string,
+      name: item.name as string,
+      parentId: typeof item.parentId === 'string' ? item.parentId : null,
+      collapsed: Boolean(item.collapsed),
+    }))
+}
+
+function migrateFoldersByRepo(raw: Record<string, unknown>): Record<string, string[]> {
+  if (isRecord(raw.foldersByRepo) && !Array.isArray(raw.foldersByRepo)) {
+    const out: Record<string, string[]> = {}
+
+    for (const [repo, value] of Object.entries(raw.foldersByRepo)) {
+      if (!Array.isArray(value)) continue
+      const ids = value.filter((id): id is string => typeof id === 'string' && id.length > 0)
+      if (ids.length > 0) out[repo] = [...new Set(ids)]
+    }
+
+    return out
+  }
+
+  if (isRecord(raw.folderByRepo) && !Array.isArray(raw.folderByRepo)) {
+    const out: Record<string, string[]> = {}
+
+    for (const [repo, value] of Object.entries(raw.folderByRepo)) {
+      if (typeof value === 'string' && value.length > 0) out[repo] = [value]
+    }
+
+    return out
+  }
+
+  return {}
+}
+
+/** Normaliza layout salvo/legado (folderByRepo → foldersByRepo, parentId). */
+export function normalizeLayout(raw: unknown): RepoLayout {
+  if (!isRecord(raw)) return emptyLayout()
+
+  const folders = normalizeFolders(raw.folders)
+  const folderIds = new Set(folders.map((f) => f.id))
+
+  for (const folder of folders) {
+    if (folder.parentId && !folderIds.has(folder.parentId)) {
+      folder.parentId = null
+    }
+    if (folder.parentId === folder.id) {
+      folder.parentId = null
+    }
+  }
+
+  const foldersByRepo = migrateFoldersByRepo(raw)
+  for (const repo of Object.keys(foldersByRepo)) {
+    foldersByRepo[repo] = foldersByRepo[repo].filter((id) => folderIds.has(id))
+    if (foldersByRepo[repo].length === 0) delete foldersByRepo[repo]
+  }
+
+  return {
+    folders,
+    foldersByRepo,
+    hidden: Array.isArray(raw.hidden)
+      ? raw.hidden.filter((h): h is string => typeof h === 'string')
+      : [],
+  }
 }
 
 export function loadRepoLayout(): RepoLayout {
   try {
     const raw = localStorage.getItem(LAYOUT_KEY)
     if (!raw) return emptyLayout()
-    const parsed = JSON.parse(raw) as Partial<RepoLayout>
-    return {
-      folders: Array.isArray(parsed.folders) ? parsed.folders : [],
-      folderByRepo:
-        parsed.folderByRepo && typeof parsed.folderByRepo === 'object'
-          ? parsed.folderByRepo
-          : {},
-      hidden: Array.isArray(parsed.hidden) ? parsed.hidden : [],
-    }
+    return normalizeLayout(JSON.parse(raw) as unknown)
   } catch {
     return emptyLayout()
   }
@@ -59,12 +128,35 @@ export function setRepoHidden(layout: RepoLayout, repo: string, hidden: boolean)
   return { ...layout, hidden: [...set] }
 }
 
-export function createFolder(layout: RepoLayout, name: string): RepoLayout {
+export function folderIdsForRepo(layout: RepoLayout, repo: string): string[] {
+  return layout.foldersByRepo[repo] ?? []
+}
+
+export function isRepoInFolder(layout: RepoLayout, repo: string, folderId: string): boolean {
+  return folderIdsForRepo(layout, repo).includes(folderId)
+}
+
+export function isRepoUncategorized(layout: RepoLayout, repo: string): boolean {
+  return folderIdsForRepo(layout, repo).length === 0
+}
+
+export function createFolder(
+  layout: RepoLayout,
+  name: string,
+  parentId: string | null = null,
+): RepoLayout {
   const trimmed = name.trim()
   if (!trimmed) return layout
+
+  const parent =
+    parentId && layout.folders.some((f) => f.id === parentId) ? parentId : null
+
   return {
     ...layout,
-    folders: [...layout.folders, { id: newId(), name: trimmed, collapsed: false }],
+    folders: [
+      ...layout.folders,
+      { id: newId(), name: trimmed, parentId: parent, collapsed: false },
+    ],
   }
 }
 
@@ -77,39 +169,95 @@ export function renameFolder(layout: RepoLayout, folderId: string, name: string)
   }
 }
 
-export function deleteFolder(layout: RepoLayout, folderId: string): RepoLayout {
-  const folderByRepo = { ...layout.folderByRepo }
-  for (const [repo, fid] of Object.entries(folderByRepo)) {
-    if (fid === folderId) folderByRepo[repo] = null
+/** Ids da pasta e de toda a subárvore. */
+export function collectSubtreeIds(layout: RepoLayout, folderId: string): Set<string> {
+  const ids = new Set<string>([folderId])
+  let grew = true
+
+  while (grew) {
+    grew = false
+    for (const folder of layout.folders) {
+      if (folder.parentId && ids.has(folder.parentId) && !ids.has(folder.id)) {
+        ids.add(folder.id)
+        grew = true
+      }
+    }
   }
+
+  return ids
+}
+
+export function deleteFolder(layout: RepoLayout, folderId: string): RepoLayout {
+  const removeIds = collectSubtreeIds(layout, folderId)
+  const foldersByRepo: Record<string, string[]> = {}
+
+  for (const [repo, ids] of Object.entries(layout.foldersByRepo)) {
+    const next = ids.filter((id) => !removeIds.has(id))
+    if (next.length > 0) foldersByRepo[repo] = next
+  }
+
   return {
     ...layout,
-    folders: layout.folders.filter((f) => f.id !== folderId),
-    folderByRepo,
+    folders: layout.folders.filter((f) => !removeIds.has(f.id)),
+    foldersByRepo,
   }
 }
 
-export function assignRepoFolder(
+export function addRepoToFolder(
   layout: RepoLayout,
   repo: string,
-  folderId: string | null,
+  folderId: string,
 ): RepoLayout {
+  if (!layout.folders.some((f) => f.id === folderId)) return layout
+
+  const current = folderIdsForRepo(layout, repo)
+  if (current.includes(folderId)) return layout
+
   return {
     ...layout,
-    folderByRepo: { ...layout.folderByRepo, [repo]: folderId },
+    foldersByRepo: { ...layout.foldersByRepo, [repo]: [...current, folderId] },
   }
 }
 
-export function assignReposFolder(
+export function removeRepoFromFolder(
+  layout: RepoLayout,
+  repo: string,
+  folderId: string,
+): RepoLayout {
+  const current = folderIdsForRepo(layout, repo)
+  if (!current.includes(folderId)) return layout
+
+  const next = current.filter((id) => id !== folderId)
+  const foldersByRepo = { ...layout.foldersByRepo }
+
+  if (next.length === 0) delete foldersByRepo[repo]
+  else foldersByRepo[repo] = next
+
+  return { ...layout, foldersByRepo }
+}
+
+export function addReposToFolder(
   layout: RepoLayout,
   repos: string[],
-  folderId: string | null,
+  folderId: string,
 ): RepoLayout {
-  const folderByRepo = { ...layout.folderByRepo }
+  let next = layout
   for (const repo of repos) {
-    folderByRepo[repo] = folderId
+    next = addRepoToFolder(next, repo, folderId)
   }
-  return { ...layout, folderByRepo }
+  return next
+}
+
+export function removeReposFromFolder(
+  layout: RepoLayout,
+  repos: string[],
+  folderId: string,
+): RepoLayout {
+  let next = layout
+  for (const repo of repos) {
+    next = removeRepoFromFolder(next, repo, folderId)
+  }
+  return next
 }
 
 export function reposInFolder(
@@ -118,7 +266,7 @@ export function reposInFolder(
   allRepos: string[],
 ): string[] {
   return allRepos.filter(
-    (r) => !isRepoHidden(layout, r) && layout.folderByRepo[r] === folderId,
+    (r) => !isRepoHidden(layout, r) && isRepoInFolder(layout, r, folderId),
   )
 }
 
@@ -136,24 +284,49 @@ export function toggleFolderCollapsed(layout: RepoLayout, folderId: string): Rep
   }
 }
 
-export interface SidebarSection {
-  folder: RepoFolder | null
+export interface FolderTreeNode {
+  folder: RepoFolder
+  children: FolderTreeNode[]
   repos: string[]
 }
 
-/** Repos visíveis: pastas na ordem, depois sem pasta. */
-export function buildSidebarSections(repos: string[], layout: RepoLayout): SidebarSection[] {
-  const visible = repos.filter((r) => !isRepoHidden(layout, r))
-  const inFolder = new Set<string>()
-  const sections: SidebarSection[] = []
+export interface SidebarTree {
+  roots: FolderTreeNode[]
+  uncategorized: string[]
+}
 
-  for (const folder of layout.folders) {
-    const folderRepos = visible.filter((r) => layout.folderByRepo[r] === folder.id)
-    for (const r of folderRepos) inFolder.add(r)
-    sections.push({ folder, repos: folderRepos })
+function childFolders(layout: RepoLayout, parentId: string | null): RepoFolder[] {
+  return layout.folders.filter((f) => f.parentId === parentId)
+}
+
+function buildNode(
+  layout: RepoLayout,
+  folder: RepoFolder,
+  visible: string[],
+): FolderTreeNode {
+  return {
+    folder,
+    children: childFolders(layout, folder.id).map((child) =>
+      buildNode(layout, child, visible),
+    ),
+    repos: visible.filter((r) => isRepoInFolder(layout, r, folder.id)),
   }
+}
 
-  const uncategorized = visible.filter((r) => !inFolder.has(r))
-  sections.push({ folder: null, repos: uncategorized })
-  return sections
+/** Árvore de pastas + repos sem pasta (visível). */
+export function buildSidebarTree(repos: string[], layout: RepoLayout): SidebarTree {
+  const visible = repos.filter((r) => !isRepoHidden(layout, r))
+
+  return {
+    roots: childFolders(layout, null).map((folder) => buildNode(layout, folder, visible)),
+    uncategorized: visible.filter((r) => isRepoUncategorized(layout, r)),
+  }
+}
+
+export function layoutsEqual(a: RepoLayout, b: RepoLayout): boolean {
+  return JSON.stringify(a) === JSON.stringify(b)
+}
+
+export function cloneLayout(layout: RepoLayout): RepoLayout {
+  return structuredClone(layout)
 }

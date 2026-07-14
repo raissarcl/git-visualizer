@@ -28,7 +28,7 @@ O token fica só no **localStorage** (`gh_pat`) e é enviado apenas para `https:
 - **Filtros de API:** Só os meus, estado (Open / Merged / Closed)
 - **Filtros locais:** busca textual, só com notas, só com conflito, abertos há N dias
 - **Notas e pins:** locais ao navegador (indicadores na lista; pin no drawer)
-- **Organizar:** pastas/ocultar repos na sidebar
+- **Organizar:** pastas (com subpastas), mesmo repo em várias pastas, ocultar repos; Salvar aplica as mudanças
 - **Backup:** export/import JSON (notas, pins, layout, preferência da sidebar)
 
 ## Arquitetura (resumo)

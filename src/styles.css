@@ -416,6 +416,10 @@ body {
   padding: 0 0 0 0.35rem;
 }
 
+.repo-folder-items > .repo-folder-block {
+  margin-top: 0.15rem;
+}
+
 .repo-item-nested {
   padding-left: 1.1rem;
 }
@@ -593,6 +597,12 @@ body {
   min-height: 0;
 }
 
+.org-folder-nav-nested {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
 .org-folder-nav-item {
   display: block;
   width: 100%;
@@ -749,6 +759,7 @@ body {
 .org-footer {
   display: flex;
   justify-content: flex-end;
+  gap: 0.5rem;
   padding: 0.75rem 1.1rem;
   border-top: 1px solid var(--border);
   flex-shrink: 0;

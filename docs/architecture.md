@@ -44,7 +44,7 @@ Filtros locais rodam **depois** do fetch: só enxergam PRs já carregados (inclu
 | `gh_pat` | Personal Access Token (nunca no backup) |
 | `pr-network-notes` | Mapa `{ "owner/repo#n": "texto" }` |
 | `pr-network-pins` | Array de keys `"owner/repo#n"` |
-| `gh_repo_layout` | Pastas, `folderByRepo`, `hidden` |
+| `gh_repo_layout` | Pastas (com `parentId`), `foldersByRepo`, `hidden` |
 | `pr-network-sidebar-collapsed` | `"1"` / `"0"` |
 
 ## Backup (`version: 1`)
@@ -55,7 +55,7 @@ Filtros locais rodam **depois** do fetch: só enxergam PRs já carregados (inclu
   "exportedAt": "ISO-8601",
   "notes": {},
   "pins": [],
-  "repoLayout": { "folders": [], "folderByRepo": {}, "hidden": [] },
+  "repoLayout": { "folders": [], "foldersByRepo": {}, "hidden": [] },
   "sidebarCollapsed": false
 }
 ```

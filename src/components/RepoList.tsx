@@ -1,5 +1,6 @@
 import {
-  buildSidebarSections,
+  buildSidebarTree,
+  type FolderTreeNode,
   type RepoLayout,
   type SidebarScope,
 } from '../storage/repoLayout'
@@ -22,6 +23,91 @@ function isFolderActive(scope: SidebarScope, id: string): boolean {
   return scope.type === 'folder' && scope.id === id
 }
 
+function FolderBlock({
+  node,
+  depth,
+  scope,
+  onSelectScope,
+  onToggleFolder,
+  loadedCount,
+}: {
+  node: FolderTreeNode
+  depth: number
+  scope: SidebarScope
+  onSelectScope: (scope: SidebarScope) => void
+  onToggleFolder: (folderId: string) => void
+  loadedCount: number
+}) {
+  const folder = node.folder
+  const collapsed = Boolean(folder.collapsed)
+  const folderActive = isFolderActive(scope, folder.id)
+  const indent = depth * 12
+
+  return (
+    <li className="repo-folder-block">
+      <div
+        className={`repo-folder-header-row${folderActive ? ' is-active' : ''}`}
+        style={{ paddingLeft: indent > 0 ? `${indent}px` : undefined }}
+      >
+        <button
+          type="button"
+          className="repo-folder-chevron-btn"
+          onClick={() => onToggleFolder(folder.id)}
+          aria-expanded={!collapsed}
+          title={collapsed ? 'Expandir' : 'Recolher'}
+        >
+          {collapsed ? '▸' : '▾'}
+        </button>
+        <button
+          type="button"
+          className="repo-folder-select"
+          onClick={() => onSelectScope({ type: 'folder', id: folder.id })}
+          title={`Ver PRs de ${folder.name}`}
+        >
+          <span className="repo-folder-label">{folder.name}</span>
+          <span className="repo-item-count">
+            {folderActive ? loadedCount : node.repos.length}
+          </span>
+        </button>
+      </div>
+      {!collapsed && (
+        <ul className="repo-folder-items">
+          {node.children.map((child) => (
+            <FolderBlock
+              key={child.folder.id}
+              node={child}
+              depth={depth + 1}
+              scope={scope}
+              onSelectScope={onSelectScope}
+              onToggleFolder={onToggleFolder}
+              loadedCount={loadedCount}
+            />
+          ))}
+          {node.repos.length === 0 && node.children.length === 0 ? (
+            <li className="repo-folder-empty">Vazia</li>
+          ) : (
+            node.repos.map((name) => (
+              <li key={name}>
+                <button
+                  type="button"
+                  className={`repo-item repo-item-nested${isRepoActive(scope, name) ? ' is-active' : ''}`}
+                  onClick={() => onSelectScope({ type: 'repo', name })}
+                  title={name}
+                >
+                  <span className="repo-item-name">{name}</span>
+                  <span className="repo-item-count">
+                    {isRepoActive(scope, name) ? loadedCount : '—'}
+                  </span>
+                </button>
+              </li>
+            ))
+          )}
+        </ul>
+      )}
+    </li>
+  )
+}
+
 export function RepoList({
   repos,
   layout,
@@ -31,7 +117,7 @@ export function RepoList({
   onOrganize,
   loadedCount,
 }: RepoListProps) {
-  const sections = buildSidebarSections(repos, layout)
+  const tree = buildSidebarTree(repos, layout)
   const networkActive = scope.type === 'network'
 
   return (
@@ -54,78 +140,33 @@ export function RepoList({
           </button>
         </li>
 
-        {sections.map((section) => {
-          if (section.folder) {
-            const folder = section.folder
-            const collapsed = Boolean(folder.collapsed)
-            const folderActive = isFolderActive(scope, folder.id)
-            return (
-              <li key={folder.id} className="repo-folder-block">
-                <div className={`repo-folder-header-row${folderActive ? ' is-active' : ''}`}>
-                  <button
-                    type="button"
-                    className="repo-folder-chevron-btn"
-                    onClick={() => onToggleFolder(folder.id)}
-                    aria-expanded={!collapsed}
-                    title={collapsed ? 'Expandir' : 'Recolher'}
-                  >
-                    {collapsed ? '▸' : '▾'}
-                  </button>
-                  <button
-                    type="button"
-                    className="repo-folder-select"
-                    onClick={() => onSelectScope({ type: 'folder', id: folder.id })}
-                    title={`Ver PRs de ${folder.name}`}
-                  >
-                    <span className="repo-folder-label">{folder.name}</span>
-                    <span className="repo-item-count">
-                      {folderActive ? loadedCount : section.repos.length}
-                    </span>
-                  </button>
-                </div>
-                {!collapsed && (
-                  <ul className="repo-folder-items">
-                    {section.repos.length === 0 ? (
-                      <li className="repo-folder-empty">Vazia</li>
-                    ) : (
-                      section.repos.map((name) => (
-                        <li key={name}>
-                          <button
-                            type="button"
-                            className={`repo-item repo-item-nested${isRepoActive(scope, name) ? ' is-active' : ''}`}
-                            onClick={() => onSelectScope({ type: 'repo', name })}
-                            title={name}
-                          >
-                            <span className="repo-item-name">{name}</span>
-                            <span className="repo-item-count">
-                              {isRepoActive(scope, name) ? loadedCount : '—'}
-                            </span>
-                          </button>
-                        </li>
-                      ))
-                    )}
-                  </ul>
-                )}
-              </li>
-            )
-          }
+        {tree.roots.map((node) => (
+          <FolderBlock
+            key={node.folder.id}
+            node={node}
+            depth={0}
+            scope={scope}
+            onSelectScope={onSelectScope}
+            onToggleFolder={onToggleFolder}
+            loadedCount={loadedCount}
+          />
+        ))}
 
-          return section.repos.map((name) => (
-            <li key={name}>
-              <button
-                type="button"
-                className={`repo-item${isRepoActive(scope, name) ? ' is-active' : ''}`}
-                onClick={() => onSelectScope({ type: 'repo', name })}
-                title={name}
-              >
-                <span className="repo-item-name">{name}</span>
-                <span className="repo-item-count">
-                  {isRepoActive(scope, name) ? loadedCount : '—'}
-                </span>
-              </button>
-            </li>
-          ))
-        })}
+        {tree.uncategorized.map((name) => (
+          <li key={name}>
+            <button
+              type="button"
+              className={`repo-item${isRepoActive(scope, name) ? ' is-active' : ''}`}
+              onClick={() => onSelectScope({ type: 'repo', name })}
+              title={name}
+            >
+              <span className="repo-item-name">{name}</span>
+              <span className="repo-item-count">
+                {isRepoActive(scope, name) ? loadedCount : '—'}
+              </span>
+            </button>
+          </li>
+        ))}
       </ul>
     </div>
   )

@@ -1,12 +1,19 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
-  assignRepoFolder,
-  assignReposFolder,
+  addReposToFolder,
+  addRepoToFolder,
+  cloneLayout,
   createFolder,
   deleteFolder,
   isRepoHidden,
+  isRepoInFolder,
+  isRepoUncategorized,
+  layoutsEqual,
+  removeReposFromFolder,
+  removeRepoFromFolder,
   renameFolder,
   setRepoHidden,
+  type RepoFolder,
   type RepoLayout,
 } from '../storage/repoLayout'
 
@@ -20,33 +27,173 @@ interface RepoOrganizerProps {
   onClose: () => void
 }
 
+function FolderNavItem({
+  folder,
+  depth,
+  active,
+  renamingId,
+  renameValue,
+  draft,
+  setActive,
+  setRenamingId,
+  setRenameValue,
+  setDraft,
+  commitRename,
+}: {
+  folder: RepoFolder
+  depth: number
+  active: ActiveTarget
+  renamingId: string | null
+  renameValue: string
+  draft: RepoLayout
+  setActive: (id: ActiveTarget) => void
+  setRenamingId: (id: string | null) => void
+  setRenameValue: (value: string) => void
+  setDraft: (layout: RepoLayout) => void
+  commitRename: () => void
+}) {
+  const children = draft.folders.filter((f) => f.parentId === folder.id)
+
+  return (
+    <li>
+      {renamingId === folder.id ? (
+        <div className="org-folder-rename" style={{ paddingLeft: `${depth * 12}px` }}>
+          <input
+            type="text"
+            value={renameValue}
+            onChange={(e) => setRenameValue(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') commitRename()
+              if (e.key === 'Escape') setRenamingId(null)
+            }}
+            autoFocus
+          />
+          <button type="button" className="btn" onClick={commitRename}>
+            OK
+          </button>
+        </div>
+      ) : (
+        <div
+          className={`org-folder-nav-row${active === folder.id ? ' is-active' : ''}`}
+          style={{ paddingLeft: `${depth * 12}px` }}
+        >
+          <button
+            type="button"
+            className="org-folder-nav-item"
+            onClick={() => setActive(folder.id)}
+          >
+            {folder.name}
+          </button>
+          <button
+            type="button"
+            className="btn-icon"
+            title="Renomear"
+            onClick={() => {
+              setRenamingId(folder.id)
+              setRenameValue(folder.name)
+            }}
+          >
+            ✎
+          </button>
+          <button
+            type="button"
+            className="btn-icon"
+            title="Apagar (inclui subpastas)"
+            onClick={() => {
+              const next = deleteFolder(draft, folder.id)
+              setDraft(next)
+              if (
+                active !== 'uncategorized' &&
+                !next.folders.some((f) => f.id === active)
+              ) {
+                setActive('uncategorized')
+              }
+            }}
+          >
+            ×
+          </button>
+        </div>
+      )}
+      {children.length > 0 && (
+        <ul className="org-folder-nav-nested">
+          {children.map((child) => (
+            <FolderNavItem
+              key={child.id}
+              folder={child}
+              depth={depth + 1}
+              active={active}
+              renamingId={renamingId}
+              renameValue={renameValue}
+              draft={draft}
+              setActive={setActive}
+              setRenamingId={setRenamingId}
+              setRenameValue={setRenameValue}
+              setDraft={setDraft}
+              commitRename={commitRename}
+            />
+          ))}
+        </ul>
+      )}
+    </li>
+  )
+}
+
 export function RepoOrganizer({ open, repos, layout, onChange, onClose }: RepoOrganizerProps) {
+  const [draft, setDraft] = useState<RepoLayout>(() => cloneLayout(layout))
   const [newFolderName, setNewFolderName] = useState('')
   const [renamingId, setRenamingId] = useState<string | null>(null)
   const [renameValue, setRenameValue] = useState('')
   const [filter, setFilter] = useState('')
   const [active, setActive] = useState<ActiveTarget>('uncategorized')
+  const wasOpen = useRef(false)
+
+  useEffect(() => {
+    if (open && !wasOpen.current) {
+      setDraft(cloneLayout(layout))
+      setNewFolderName('')
+      setRenamingId(null)
+      setRenameValue('')
+      setFilter('')
+      setActive('uncategorized')
+    }
+
+    wasOpen.current = open
+  }, [open, layout])
 
   useEffect(() => {
     if (!open) return
-    if (active !== 'uncategorized' && !layout.folders.some((f) => f.id === active)) {
+    if (active !== 'uncategorized' && !draft.folders.some((f) => f.id === active)) {
       setActive('uncategorized')
     }
-  }, [open, active, layout.folders])
+  }, [open, active, draft.folders])
 
   const filteredRepos = useMemo(() => {
     const q = filter.trim().toLowerCase()
-    if (!q) return repos
-    return repos.filter((r) => r.toLowerCase().includes(q))
-  }, [repos, filter])
+    const base =
+      active === 'uncategorized'
+        ? repos.filter((r) => isRepoUncategorized(draft, r))
+        : repos
+
+    if (!q) return base
+    return base.filter((r) => r.toLowerCase().includes(q))
+  }, [repos, filter, active, draft])
+
+  const rootFolders = useMemo(
+    () => draft.folders.filter((f) => f.parentId === null),
+    [draft.folders],
+  )
+
+  const dirty = !layoutsEqual(draft, layout)
 
   if (!open) return null
+
+  const createParentId = active === 'uncategorized' ? null : active
 
   const handleCreateFolder = () => {
     const trimmed = newFolderName.trim()
     if (!trimmed) return
-    const next = createFolder(layout, trimmed)
-    onChange(next)
+    const next = createFolder(draft, trimmed, createParentId)
+    setDraft(next)
     const created = next.folders[next.folders.length - 1]
     if (created) setActive(created.id)
     setNewFolderName('')
@@ -54,46 +201,61 @@ export function RepoOrganizer({ open, repos, layout, onChange, onClose }: RepoOr
 
   const commitRename = () => {
     if (renamingId) {
-      onChange(renameFolder(layout, renamingId, renameValue))
+      setDraft(renameFolder(draft, renamingId, renameValue))
     }
     setRenamingId(null)
     setRenameValue('')
   }
 
+  const requestClose = () => {
+    if (dirty && !window.confirm('Descartar alterações não salvas?')) return
+    onClose()
+  }
+
+  const handleSave = () => {
+    onChange(draft)
+    onClose()
+  }
+
   const isInActiveFolder = (repo: string): boolean => {
-    const folderId = layout.folderByRepo[repo] ?? null
-    if (active === 'uncategorized') return folderId === null
-    return folderId === active
+    if (active === 'uncategorized') return isRepoUncategorized(draft, repo)
+    return isRepoInFolder(draft, repo, active)
   }
 
   const toggleInActiveFolder = (repo: string, checked: boolean) => {
-    if (active === 'uncategorized') {
-      if (checked) onChange(assignRepoFolder(layout, repo, null))
-      return
-    }
-    onChange(assignRepoFolder(layout, repo, checked ? active : null))
+    if (active === 'uncategorized') return
+    setDraft(
+      checked
+        ? addRepoToFolder(draft, repo, active)
+        : removeRepoFromFolder(draft, repo, active),
+    )
   }
 
   const selectAllInFolder = () => {
     if (active === 'uncategorized') return
-    onChange(assignReposFolder(layout, filteredRepos, active))
+    setDraft(addReposToFolder(draft, filteredRepos, active))
   }
 
   const clearAllInFolder = () => {
     if (active === 'uncategorized') return
-    const toClear = filteredRepos.filter((r) => layout.folderByRepo[r] === active)
-    onChange(assignReposFolder(layout, toClear, null))
+    const toClear = filteredRepos.filter((r) => isRepoInFolder(draft, r, active))
+    setDraft(removeReposFromFolder(draft, toClear, active))
   }
 
-  const activeLabel =
-    active === 'uncategorized'
-      ? 'Sem pasta'
-      : (layout.folders.find((f) => f.id === active)?.name ?? 'Pasta')
+  const activeFolder =
+    active === 'uncategorized' ? null : draft.folders.find((f) => f.id === active)
+
+  const activeLabel = active === 'uncategorized' ? 'Sem pasta' : (activeFolder?.name ?? 'Pasta')
 
   const canBulk = active !== 'uncategorized'
 
+  const createPlaceholder =
+    active === 'uncategorized'
+      ? 'Nova pasta na raiz…'
+      : `Subpasta em ${activeFolder?.name ?? 'pasta'}…`
+
   return (
-    <div className="org-overlay" role="presentation" onClick={onClose}>
+    <div className="org-overlay" role="presentation" onClick={requestClose}>
       <div
         className="org-modal org-modal-split"
         role="dialog"
@@ -105,7 +267,7 @@ export function RepoOrganizer({ open, repos, layout, onChange, onClose }: RepoOr
             <h2 id="org-title">Organizar repositórios</h2>
             <p className="org-subtitle">{repos.length} repos disponíveis</p>
           </div>
-          <button type="button" className="detail-close" onClick={onClose} aria-label="Fechar">
+          <button type="button" className="detail-close" onClick={requestClose} aria-label="Fechar">
             ×
           </button>
         </header>
@@ -116,7 +278,7 @@ export function RepoOrganizer({ open, repos, layout, onChange, onClose }: RepoOr
             <div className="org-folder-create">
               <input
                 type="text"
-                placeholder="Nova pasta…"
+                placeholder={createPlaceholder}
                 value={newFolderName}
                 onChange={(e) => setNewFolderName(e.target.value)}
                 onKeyDown={(e) => {
@@ -138,60 +300,21 @@ export function RepoOrganizer({ open, repos, layout, onChange, onClose }: RepoOr
                   Sem pasta
                 </button>
               </li>
-              {layout.folders.map((folder) => (
-                <li key={folder.id}>
-                  {renamingId === folder.id ? (
-                    <div className="org-folder-rename">
-                      <input
-                        type="text"
-                        value={renameValue}
-                        onChange={(e) => setRenameValue(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') commitRename()
-                          if (e.key === 'Escape') setRenamingId(null)
-                        }}
-                        autoFocus
-                      />
-                      <button type="button" className="btn" onClick={commitRename}>
-                        OK
-                      </button>
-                    </div>
-                  ) : (
-                    <div
-                      className={`org-folder-nav-row${active === folder.id ? ' is-active' : ''}`}
-                    >
-                      <button
-                        type="button"
-                        className="org-folder-nav-item"
-                        onClick={() => setActive(folder.id)}
-                      >
-                        {folder.name}
-                      </button>
-                      <button
-                        type="button"
-                        className="btn-icon"
-                        title="Renomear"
-                        onClick={() => {
-                          setRenamingId(folder.id)
-                          setRenameValue(folder.name)
-                        }}
-                      >
-                        ✎
-                      </button>
-                      <button
-                        type="button"
-                        className="btn-icon"
-                        title="Apagar"
-                        onClick={() => {
-                          onChange(deleteFolder(layout, folder.id))
-                          if (active === folder.id) setActive('uncategorized')
-                        }}
-                      >
-                        ×
-                      </button>
-                    </div>
-                  )}
-                </li>
+              {rootFolders.map((folder) => (
+                <FolderNavItem
+                  key={folder.id}
+                  folder={folder}
+                  depth={0}
+                  active={active}
+                  renamingId={renamingId}
+                  renameValue={renameValue}
+                  draft={draft}
+                  setActive={setActive}
+                  setRenamingId={setRenamingId}
+                  setRenameValue={setRenameValue}
+                  setDraft={setDraft}
+                  commitRename={commitRename}
+                />
               ))}
             </ul>
           </aside>
@@ -219,8 +342,8 @@ export function RepoOrganizer({ open, repos, layout, onChange, onClose }: RepoOr
             )}
             <p className="org-hint">
               {active === 'uncategorized'
-                ? 'Repos sem pasta. Selecione uma pasta à esquerda e marque repos para adicioná-los.'
-                : 'Marque repos (ou use Selecionar todos). Visível controla a sidebar.'}
+                ? 'Repos sem nenhuma pasta. Selecione uma pasta à esquerda e marque repos para adicioná-los (um repo pode estar em várias pastas).'
+                : 'Marque repos nesta pasta (ou use Selecionar todos). Visível controla a sidebar. Desmarcar remove só desta pasta.'}
             </p>
             <ul className="org-repo-list scrollable">
               {filteredRepos.length === 0 ? (
@@ -228,7 +351,7 @@ export function RepoOrganizer({ open, repos, layout, onChange, onClose }: RepoOr
               ) : (
                 filteredRepos.map((repo) => {
                   const inFolder = isInActiveFolder(repo)
-                  const visible = !isRepoHidden(layout, repo)
+                  const visible = !isRepoHidden(draft, repo)
                   return (
                     <li key={repo} className="org-repo-row-v2">
                       <label className="org-folder-check">
@@ -243,7 +366,7 @@ export function RepoOrganizer({ open, repos, layout, onChange, onClose }: RepoOr
                       <button
                         type="button"
                         className={`btn-vis${visible ? ' is-on' : ''}`}
-                        onClick={() => onChange(setRepoHidden(layout, repo, visible))}
+                        onClick={() => setDraft(setRepoHidden(draft, repo, visible))}
                         title={visible ? 'Ocultar da sidebar' : 'Mostrar na sidebar'}
                       >
                         {visible ? 'Visível' : 'Oculto'}
@@ -257,8 +380,11 @@ export function RepoOrganizer({ open, repos, layout, onChange, onClose }: RepoOr
         </div>
 
         <footer className="org-footer">
-          <button type="button" className="btn btn-primary" onClick={onClose}>
-            Concluído
+          <button type="button" className="btn" onClick={requestClose}>
+            Cancelar
+          </button>
+          <button type="button" className="btn btn-primary" onClick={handleSave} disabled={!dirty}>
+            Salvar
           </button>
         </footer>
       </div>
