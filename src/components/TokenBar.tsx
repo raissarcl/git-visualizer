@@ -8,6 +8,8 @@ interface TokenBarProps {
   hasToken: boolean
   editingToken: boolean
   loading: boolean
+  theme: 'dark' | 'light'
+  onToggleTheme: () => void
 }
 
 export function TokenBar({
@@ -20,6 +22,8 @@ export function TokenBar({
   hasToken,
   editingToken,
   loading,
+  theme,
+  onToggleTheme,
 }: TokenBarProps) {
   const showForm = editingToken || !hasToken
 
@@ -61,6 +65,15 @@ export function TokenBar({
           </button>
         </>
       )}
+      <button
+        type="button"
+        className="btn btn-theme"
+        onClick={onToggleTheme}
+        title={theme === 'dark' ? 'Mudar para tema claro' : 'Mudar para tema escuro'}
+        aria-label={theme === 'dark' ? 'Mudar para tema claro' : 'Mudar para tema escuro'}
+      >
+        {theme === 'dark' ? 'Claro' : 'Escuro'}
+      </button>
       <button
         type="button"
         className="btn btn-primary"

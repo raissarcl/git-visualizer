@@ -10,6 +10,7 @@ import { useAuth } from './hooks/useAuth'
 import { useLocalWorkspace } from './hooks/useLocalWorkspace'
 import { usePrFilters } from './hooks/usePrFilters'
 import { usePullRequests } from './hooks/usePullRequests'
+import { useTheme } from './hooks/useTheme'
 import { isPinned } from './storage/pins'
 import { reposInFolder, toggleFolderCollapsed } from './storage/repoLayout'
 import './styles.css'
@@ -21,6 +22,7 @@ export default function App() {
   const auth = useAuth()
   const workspace = useLocalWorkspace()
   const filters = usePrFilters()
+  const { theme, toggleTheme } = useTheme()
 
   const prData = usePullRequests({
     token: auth.token,
@@ -79,6 +81,8 @@ export default function App() {
           hasToken={auth.hasToken}
           editingToken={auth.editingToken}
           loading={prData.loading}
+          theme={theme}
+          onToggleTheme={toggleTheme}
         />
         {prData.error && <div className="banner banner-error">{prData.error}</div>}
       </header>
