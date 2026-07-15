@@ -148,7 +148,7 @@ export default function App() {
               </p>
             ) : (
               <p className="main-scope">
-                Sua rede (involves você). Selecione um repo ou uma pasta.
+                Sua rede (somente você). Selecione um repo ou uma pasta.
               </p>
             )}
             {prData.loading && <p className="main-loading">Carregando…</p>}

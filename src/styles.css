@@ -27,7 +27,7 @@
   --glow-2: rgba(61, 139, 253, 0.1);
   --radius: 8px;
   --sidebar-w: 288px;
-  --drawer-w: 22rem;
+  --drawer-w: 30rem;
   --font: 'IBM Plex Sans', system-ui, sans-serif;
   --mono: 'IBM Plex Mono', ui-monospace, monospace;
 }
@@ -1555,7 +1555,8 @@ body {
 }
 
 .detail-notes-preview {
-  max-height: 12rem;
+  min-height: 12rem;
+  max-height: 22rem;
 }
 
 .detail-conflict-banner {
@@ -1572,7 +1573,7 @@ body {
 .detail-notes-input {
   display: block;
   width: 100%;
-  min-height: 6rem;
+  min-height: 12rem;
   resize: vertical;
   font-family: var(--font);
   font-size: 0.85rem;
@@ -1738,7 +1739,7 @@ body {
   }
 
   .detail-drawer {
-    width: min(100%, 20rem);
+    width: min(100%, 26rem);
   }
 
   .org-split {

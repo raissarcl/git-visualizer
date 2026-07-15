@@ -178,7 +178,7 @@ export function PrDetail({
             }}
             onBlur={() => persist(draft)}
             placeholder="Ex.: script de banco a rodar antes do deploy…"
-            rows={5}
+            rows={10}
             spellCheck
           />
         ) : draft.trim() ? (

@@ -32,8 +32,9 @@ flowchart TB
 1. Usuário salva PAT (`github/token`) → `useAuth`.
 2. `usePullRequests` busca repos + PRs (`github/repos`, `github/search`) conforme escopo e filtros de API.
 3. `usePrFilters` aplica filtros locais + ordenação de pins (`domain/filters`).
-4. Lista/drawer leem notes/pins de `useLocalWorkspace` (`storage/*`).
-5. Backup exporta/importa um JSON versionado **sem** o PAT (`storage/backup`).
+4. Lista/drawer leem notes/pins de `useLocalWorkspace` (`storage/*`); pastas via `repoLayout` (árvore + multi-associação).
+5. `useTheme` aplica claro/escuro em `document.documentElement` (`storage/preferences`).
+6. Backup exporta/importa um JSON versionado **sem** o PAT nem o tema (`storage/backup`).
 
 Filtros locais rodam **depois** do fetch: só enxergam PRs já carregados (incluindo páginas já pedidas com “Carregar mais”).
 
@@ -44,8 +45,11 @@ Filtros locais rodam **depois** do fetch: só enxergam PRs já carregados (inclu
 | `gh_pat` | Personal Access Token (nunca no backup) |
 | `pr-network-notes` | Mapa `{ "owner/repo#n": "texto" }` |
 | `pr-network-pins` | Array de keys `"owner/repo#n"` |
-| `gh_repo_layout` | Pastas (com `parentId`), `foldersByRepo`, `hidden` |
+| `gh_repo_layout` | Pastas (`parentId` para subpastas), `foldersByRepo`, `hidden` |
 | `pr-network-sidebar-collapsed` | `"1"` / `"0"` |
+| `pr-network-theme` | `"dark"` \| `"light"` (fora do backup) |
+
+Layouts antigos com `folderByRepo` (um repo → uma pasta) são migrados na carga para `foldersByRepo`.
 
 ## Backup (`version: 1`)
 
@@ -60,11 +64,12 @@ Filtros locais rodam **depois** do fetch: só enxergam PRs já carregados (inclu
 }
 ```
 
-Importação **substitui** notes/pins/layout/preferência de sidebar.
+Importação **substitui** notes/pins/layout/preferência de sidebar. Tema e PAT não entram no arquivo.
 
 ## Decisões
 
 - Sem servidor próprio: PAT no cliente; escopos mínimos no README.
 - SOLID pragmático: um módulo/hook por responsabilidade; sem container de DI.
-- Testes só em lógica pura (`domain`, parse de backup) — Vitest.
+- Testes só em lógica pura (`domain`, parse de backup, `repoLayout`) — Vitest.
 - Markdown na descrição do PR (e preview das notas) via `react-markdown` + GFM.
+- Tema via `data-theme` + tokens CSS; preferência em `useTheme` / `storage/preferences`.

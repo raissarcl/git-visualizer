@@ -24,12 +24,13 @@ O token fica só no **localStorage** (`gh_pat`) e é enviado apenas para `https:
 
 ## Funcionalidades
 
-- **Escopos:** Sua rede (`involves:@me`), um repositório, ou uma pasta de repos
+- **Escopos:** Sua rede (`involves:@me`), um repositório, ou uma pasta de repos (só repos diretos da pasta)
 - **Filtros de API:** Só os meus, estado (Open / Merged / Closed)
 - **Filtros locais:** busca textual, só com notas, só com conflito, abertos há N dias
-- **Notas e pins:** locais ao navegador (indicadores na lista; pin no drawer)
-- **Organizar:** pastas (com subpastas), mesmo repo em várias pastas, ocultar repos; Salvar aplica as mudanças
-- **Backup:** export/import JSON (notas, pins, layout, preferência da sidebar)
+- **Notas e pins:** locais ao navegador (indicadores na lista; pin e notas no drawer de detalhes)
+- **Organizar:** pastas com subpastas, mesmo repo em várias pastas, ocultar repos; as mudanças só gravam ao clicar em **Salvar**
+- **Tema:** claro / escuro (botão ao lado do PAT; preferência no navegador)
+- **Backup:** export/import JSON (notas, pins, layout, preferência da sidebar) — sem tema e sem PAT
 
 ## Arquitetura (resumo)
 
