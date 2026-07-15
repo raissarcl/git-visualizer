@@ -1,6 +1,30 @@
-import { describe, expect, it } from 'vitest'
-import { parseBackupJson } from './backup'
-import { normalizeLayout } from './repoLayout'
+import { describe, expect, it, beforeEach, vi } from 'vitest'
+import {
+  applyImportedData,
+  buildLocalBackup,
+  clearLocalData,
+  parseBackupJson,
+} from './backup'
+import { loadNotes } from './notes'
+import { loadPins } from './pins'
+import { loadSidebarCollapsed } from './preferences'
+import { emptyLayout, loadRepoLayout, normalizeLayout } from './repoLayout'
+
+function mockLocalStorage() {
+  const store = new Map<string, string>()
+  vi.stubGlobal('localStorage', {
+    getItem: (key: string) => store.get(key) ?? null,
+    setItem: (key: string, value: string) => {
+      store.set(key, String(value))
+    },
+    removeItem: (key: string) => {
+      store.delete(key)
+    },
+    clear: () => {
+      store.clear()
+    },
+  })
+}
 
 describe('parseBackupJson', () => {
   it('parses a valid v1 backup', () => {
@@ -49,6 +73,39 @@ describe('parseBackupJson', () => {
 
   it('rejects wrong version', () => {
     expect(() => parseBackupJson(JSON.stringify({ version: 99 }))).toThrow(/version/)
+  })
+})
+
+describe('clearLocalData', () => {
+  beforeEach(() => {
+    mockLocalStorage()
+  })
+
+  it('wipes notes, pins, layout and sidebar without touching token', () => {
+    localStorage.setItem('gh_pat', 'ghp_secret')
+    applyImportedData({
+      notes: { 'acme/api#1': 'note' },
+      pins: new Set(['acme/api#1']),
+      repoLayout: {
+        folders: [{ id: 'f1', name: 'Work', parentId: null }],
+        foldersByRepo: { 'acme/api': ['f1'] },
+        hidden: ['acme/legacy'],
+      },
+      sidebarCollapsed: true,
+    })
+
+    const cleared = clearLocalData()
+
+    expect(cleared.notes).toEqual({})
+    expect(cleared.pins.size).toBe(0)
+    expect(cleared.repoLayout).toEqual(emptyLayout())
+    expect(cleared.sidebarCollapsed).toBe(false)
+    expect(loadNotes()).toEqual({})
+    expect(loadPins().size).toBe(0)
+    expect(loadRepoLayout()).toEqual(emptyLayout())
+    expect(loadSidebarCollapsed()).toBe(false)
+    expect(localStorage.getItem('gh_pat')).toBe('ghp_secret')
+    expect(buildLocalBackup().pins).toEqual([])
   })
 })
 

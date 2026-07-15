@@ -9,6 +9,7 @@ import { loadNotes, saveNotes } from './notes'
 import { loadPins, savePins } from './pins'
 import { SIDEBAR_COLLAPSED_KEY, saveSidebarCollapsed } from './preferences'
 import {
+  emptyLayout,
   loadRepoLayout,
   normalizeLayout,
   saveRepoLayout,
@@ -108,4 +109,16 @@ export function applyImportedData(data: ImportedLocalData): void {
   savePins(data.pins)
   saveRepoLayout(data.repoLayout)
   saveSidebarCollapsed(data.sidebarCollapsed)
+}
+
+/** Limpa notas, pins, pastas e sidebar (nunca toca o PAT nem o tema). */
+export function clearLocalData(): ImportedLocalData {
+  const empty: ImportedLocalData = {
+    notes: {},
+    pins: new Set(),
+    repoLayout: emptyLayout(),
+    sidebarCollapsed: false,
+  }
+  applyImportedData(empty)
+  return empty
 }

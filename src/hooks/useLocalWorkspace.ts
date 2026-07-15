@@ -5,6 +5,7 @@
 import { useCallback, useState } from 'react'
 import {
   applyImportedData,
+  clearLocalData,
   downloadLocalBackup,
   parseBackupJson,
 } from '../storage/backup'
@@ -86,6 +87,15 @@ export function useLocalWorkspace() {
     setScope((current) => clampScope(current, data.repoLayout))
   }, [])
 
+  const handleClearLocalData = useCallback(() => {
+    const data = clearLocalData()
+    setNotes(data.notes)
+    setPins(data.pins)
+    setLayout(data.repoLayout)
+    setSidebarCollapsed(data.sidebarCollapsed)
+    setScope({ type: 'network' })
+  }, [])
+
   const selectScope = useCallback((next: SidebarScope) => {
     setScope(next)
   }, [])
@@ -106,5 +116,6 @@ export function useLocalWorkspace() {
     setScope,
     downloadLocalBackup,
     handleImportFile,
+    handleClearLocalData,
   }
 }

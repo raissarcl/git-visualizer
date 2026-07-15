@@ -9,7 +9,6 @@ import { getStoredToken, saveToken } from '../github'
 export function useAuth() {
   const [token, setToken] = useState(() => getStoredToken())
   const [tokenInput, setTokenInput] = useState('')
-  const [editingToken, setEditingToken] = useState(() => !getStoredToken())
 
   const save = useCallback(() => {
     saveToken(tokenInput)
@@ -18,20 +17,13 @@ export function useAuth() {
     setToken(next)
     setTokenInput('')
 
-    if (next) setEditingToken(false)
-    else setEditingToken(true)
-
     return next
   }, [tokenInput])
 
-  const startEditToken = useCallback(() => {
-    setEditingToken(true)
+  const clearToken = useCallback(() => {
+    saveToken('')
+    setToken('')
     setTokenInput('')
-  }, [])
-
-  const cancelEditToken = useCallback(() => {
-    setTokenInput('')
-    if (getStoredToken()) setEditingToken(false)
   }, [])
 
   return {
@@ -40,9 +32,7 @@ export function useAuth() {
     token,
     setToken,
     save,
+    clearToken,
     hasToken: Boolean(token),
-    editingToken,
-    startEditToken,
-    cancelEditToken,
   }
 }

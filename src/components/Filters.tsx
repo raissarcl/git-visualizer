@@ -19,6 +19,7 @@ interface FiltersProps {
   hasMore: boolean
   onExport: () => void
   onImportFile: (file: File) => Promise<void>
+  onClearLocalData: () => void
 }
 
 export function Filters({
@@ -38,12 +39,25 @@ export function Filters({
   hasMore,
   onExport,
   onImportFile,
+  onClearLocalData,
 }: FiltersProps) {
   const fileRef = useRef<HTMLInputElement>(null)
   const [importError, setImportError] = useState<string | null>(null)
   const [importOk, setImportOk] = useState(false)
+  const [clearedOk, setClearedOk] = useState(false)
 
   const advancedActive = state !== 'all' || minOpenDays > 0
+
+  const handleClear = () => {
+    const ok = window.confirm(
+      'Limpar notas, pins e pastas deste navegador?\n\nO token e o tema não serão removidos.',
+    )
+    if (!ok) return
+    onClearLocalData()
+    setImportError(null)
+    setImportOk(false)
+    setClearedOk(true)
+  }
 
   return (
     <div className="sidebar-filters">
@@ -140,6 +154,7 @@ export function Filters({
               onClick={() => {
                 setImportError(null)
                 setImportOk(false)
+                setClearedOk(false)
                 fileRef.current?.click()
               }}
             >
@@ -157,16 +172,22 @@ export function Filters({
                 onImportFile(file)
                   .then(() => {
                     setImportError(null)
+                    setClearedOk(false)
                     setImportOk(true)
                   })
                   .catch((err) => {
                     setImportOk(false)
+                    setClearedOk(false)
                     setImportError(err instanceof Error ? err.message : 'Falha ao importar.')
                   })
               }}
             />
           </div>
+          <button type="button" className="btn-backup btn-backup-danger" onClick={handleClear}>
+            Limpar dados locais
+          </button>
           {importOk && <p className="filters-backup-ok">Backup importado.</p>}
+          {clearedOk && <p className="filters-backup-ok">Dados locais limpos.</p>}
           {importError && <p className="filters-backup-error">{importError}</p>}
         </div>
       </details>

@@ -20,17 +20,22 @@ function formatDate(iso: string): string {
   })
 }
 
+async function copyText(value: string): Promise<boolean> {
+  try {
+    await navigator.clipboard.writeText(value)
+    return true
+  } catch {
+    return false
+  }
+}
+
 function CopyBranch({ label, value }: { label: string; value: string }) {
   const [copied, setCopied] = useState(false)
 
   const copy = async () => {
-    try {
-      await navigator.clipboard.writeText(value)
-      setCopied(true)
-      window.setTimeout(() => setCopied(false), 1500)
-    } catch {
-      // ignore
-    }
+    if (!(await copyText(value))) return
+    setCopied(true)
+    window.setTimeout(() => setCopied(false), 1500)
   }
 
   return (
@@ -41,6 +46,52 @@ function CopyBranch({ label, value }: { label: string; value: string }) {
         {copied ? 'Copiado!' : 'Copiar'}
       </button>
     </div>
+  )
+}
+
+function CopyGithubLink({ url }: { url: string }) {
+  const [copied, setCopied] = useState(false)
+
+  const copy = async () => {
+    if (!(await copyText(url))) return
+    setCopied(true)
+    window.setTimeout(() => setCopied(false), 1500)
+  }
+
+  return (
+    <button
+      type="button"
+      className="btn"
+      onClick={() => {
+        copy()
+      }}
+      title="Copiar link do GitHub"
+    >
+      {copied ? 'Copiado!' : 'Copiar link'}
+    </button>
+  )
+}
+
+function CopyMarkdown({ value }: { value: string }) {
+  const [copied, setCopied] = useState(false)
+
+  const copy = async () => {
+    if (!(await copyText(value))) return
+    setCopied(true)
+    window.setTimeout(() => setCopied(false), 1500)
+  }
+
+  return (
+    <button
+      type="button"
+      className="btn-copy"
+      onClick={() => {
+        copy()
+      }}
+      title="Copiar descrição em markdown"
+    >
+      {copied ? 'Copiado!' : 'Copiar markdown'}
+    </button>
   )
 }
 
@@ -131,7 +182,10 @@ export function PrDetail({
       </dl>
 
       <div className="detail-body">
-        <h3>Descrição</h3>
+        <div className="detail-body-heading">
+          <h3>Descrição</h3>
+          {pr.body ? <CopyMarkdown value={pr.body} /> : null}
+        </div>
         {pr.body ? (
           <div className="detail-body-md scrollable">
             <SafeMarkdown>{pr.body}</SafeMarkdown>
@@ -199,6 +253,7 @@ export function PrDetail({
         >
           Abrir no GitHub
         </a>
+        <CopyGithubLink url={pr.url} />
       </div>
     </aside>
   )

@@ -3,10 +3,8 @@ interface TokenBarProps {
   onTokenInputChange: (value: string) => void
   onSave: () => void
   onRefresh: () => void
-  onChangeToken: () => void
-  onCancelEdit: () => void
+  onClearToken: () => void
   hasToken: boolean
-  editingToken: boolean
   loading: boolean
   theme: 'dark' | 'light'
   onToggleTheme: () => void
@@ -17,19 +15,37 @@ export function TokenBar({
   onTokenInputChange,
   onSave,
   onRefresh,
-  onChangeToken,
-  onCancelEdit,
+  onClearToken,
   hasToken,
-  editingToken,
   loading,
   theme,
   onToggleTheme,
 }: TokenBarProps) {
-  const showForm = editingToken || !hasToken
+  const handleClearToken = () => {
+    const ok = window.confirm('Remover o token deste navegador?')
+    if (!ok) return
+    onClearToken()
+  }
 
   return (
     <div className="token-bar">
-      {showForm ? (
+      {hasToken ? (
+        <div className="token-field">
+          <span>GitHub PAT</span>
+          <div className="token-input-wrap">
+            <p className="token-saved">Salvo neste navegador</p>
+            <button
+              type="button"
+              className="token-clear"
+              onClick={handleClearToken}
+              title="Limpar token"
+              aria-label="Limpar token"
+            >
+              ×
+            </button>
+          </div>
+        </div>
+      ) : (
         <>
           <label className="token-field">
             <span>GitHub PAT</span>
@@ -47,21 +63,6 @@ export function TokenBar({
           </label>
           <button type="button" className="btn" onClick={onSave}>
             Salvar
-          </button>
-          {hasToken && (
-            <button type="button" className="btn" onClick={onCancelEdit}>
-              Cancelar
-            </button>
-          )}
-        </>
-      ) : (
-        <>
-          <div className="token-field">
-            <span>GitHub PAT</span>
-            <p className="token-saved">Salvo neste navegador</p>
-          </div>
-          <button type="button" className="btn" onClick={onChangeToken}>
-            Trocar
           </button>
         </>
       )}

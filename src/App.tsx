@@ -59,6 +59,11 @@ export default function App() {
     }
   }
 
+  const handleClearToken = () => {
+    auth.clearToken()
+    prData.resetOnEmptyToken()
+  }
+
   const handleSelectScope = (next: Parameters<typeof workspace.selectScope>[0]) => {
     workspace.selectScope(next)
     prData.setSelectedPr(null)
@@ -76,10 +81,8 @@ export default function App() {
           onTokenInputChange={auth.setTokenInput}
           onSave={handleSave}
           onRefresh={prData.refresh}
-          onChangeToken={auth.startEditToken}
-          onCancelEdit={auth.cancelEditToken}
+          onClearToken={handleClearToken}
           hasToken={auth.hasToken}
-          editingToken={auth.editingToken}
           loading={prData.loading}
           theme={theme}
           onToggleTheme={toggleTheme}
@@ -118,6 +121,7 @@ export default function App() {
               hasMore={prData.pageInfo.hasNextPage}
               onExport={workspace.downloadLocalBackup}
               onImportFile={workspace.handleImportFile}
+              onClearLocalData={workspace.handleClearLocalData}
             />
           </div>
         </aside>
