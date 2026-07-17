@@ -9,6 +9,9 @@ export type PinSet = Set<string>
 
 export type AgeFilterDays = 0 | 3 | 7 | 14 | 30
 
+/** Janela recente: 0 = desligado; 1 = últimas 24h. */
+export type PeriodFilterDays = 0 | 1 | 7 | 30
+
 /** Filtros aplicados no cliente após o fetch da API. */
 export interface LocalFilters {
   query: string
@@ -16,12 +19,22 @@ export interface LocalFilters {
   conflictOnly: boolean
   /** 0 = desligado */
   minOpenDays: AgeFilterDays
+  /** 0 = desligado; filtra por updatedAt nos últimos N dias */
+  withinDays: PeriodFilterDays
 }
 
 function openAgeDays(pr: PullRequest, now: number): number {
   const created = new Date(pr.createdAt).getTime()
   if (Number.isNaN(created)) return 0
   return (now - created) / (1000 * 60 * 60 * 24)
+}
+
+/** true se `iso` está dentro dos últimos `withinDays` dias (1 = 24h). */
+export function isWithinDays(iso: string, withinDays: PeriodFilterDays, now = Date.now()): boolean {
+  if (withinDays <= 0) return true
+  const t = new Date(iso).getTime()
+  if (Number.isNaN(t)) return false
+  return now - t <= withinDays * 24 * 60 * 60 * 1000
 }
 
 function hasNoteText(notes: PrNotesMap, key: string): boolean {
@@ -67,6 +80,10 @@ export function filterPullRequests(
   if (filters.minOpenDays > 0) {
     const min = filters.minOpenDays
     result = result.filter((pr) => pr.state === 'OPEN' && openAgeDays(pr, now) >= min)
+  }
+
+  if (filters.withinDays > 0) {
+    result = result.filter((pr) => isWithinDays(pr.updatedAt, filters.withinDays, now))
   }
 
   return result

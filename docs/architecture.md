@@ -1,17 +1,17 @@
 # Arquitetura — PR Network
 
-App SPA sem backend. O browser fala direto com a GitHub GraphQL API; preferências e anotações ficam em `localStorage`.
+App SPA sem backend. O browser fala direto com a GitHub GraphQL API (PRs) e a REST API (Actions); preferências e anotações ficam em `localStorage`.
 
 ## Camadas
 
 | Pasta | Responsabilidade |
 |-------|------------------|
-| `domain/` | Tipos (`PullRequest`, …) e regras puras (filtros, `prKey`). Sem React, sem I/O. |
-| `github/` | Adaptador remoto: cliente GraphQL, queries, mappers, search/repos, PAT. |
+| `domain/` | Tipos (`PullRequest`, `WorkflowRun`, …) e regras puras (filtros, `prKey`, badges de run). Sem React, sem I/O. |
+| `github/` | Adaptador remoto: cliente GraphQL, cliente REST, queries, Actions, mappers, search/repos, PAT, parse de YAML de workflow. |
 | `storage/` | Persistência local: notes, pins, layout de repos, backup, preferências UI. |
 | `hooks/` | Orquestra estado React e chama `github` / `storage` / `domain`. |
 | `components/` | UI apresentacional (recebe props). |
-| `App.tsx` | Compõe hooks + layout shell. |
+| `App.tsx` | Compõe hooks + layout shell (abas PRs / Actions). |
 
 Dependências permitidas: UI → hooks/domain/storage; hooks → github/storage/domain; github/storage → domain. **Não** o contrário.
 
@@ -32,11 +32,14 @@ flowchart TB
 1. Usuário salva PAT (`github/token`) → `useAuth`.
 2. `usePullRequests` busca repos + PRs (`github/repos`, `github/search`) conforme escopo e filtros de API.
 3. `usePrFilters` aplica filtros locais + ordenação de pins (`domain/filters`).
-4. Lista/drawer leem notes/pins de `useLocalWorkspace` (`storage/*`); pastas via `repoLayout` (árvore + multi-associação).
-5. `useTheme` aplica claro/escuro em `document.documentElement` (`storage/preferences`).
-6. Backup exporta/importa um JSON versionado **sem** o PAT nem o tema (`storage/backup`).
+4. Na aba Actions, `useActions` lista runs via REST (`github/actions` / `github/rest`), carrega jobs no drawer e muta (cancel / rerun / dispatch).
+5. Lista/drawer de PRs leem notes/pins de `useLocalWorkspace` (`storage/*`); pastas via `repoLayout` (árvore + multi-associação).
+6. `useTheme` aplica claro/escuro em `document.documentElement` (`storage/preferences`).
+7. Backup exporta/importa um JSON versionado **sem** o PAT nem o tema (`storage/backup`).
 
-Filtros locais rodam **depois** do fetch: só enxergam PRs já carregados (incluindo páginas já pedidas com “Carregar mais”).
+Filtros locais de PRs rodam **depois** do fetch: só enxergam PRs já carregados (incluindo páginas já pedidas com “Carregar mais”). Filtros de Actions (texto/status) também são locais sobre os runs já buscados.
+
+Escopo Actions: `repo` e `pasta` carregam runs; `rede` pede seleção de repo/pasta (evita flood de rate limit).
 
 ## Chaves `localStorage`
 
@@ -68,8 +71,9 @@ Importação **substitui** notes/pins/layout/preferência de sidebar. Tema e PAT
 
 ## Decisões
 
-- Sem servidor próprio: PAT no cliente; escopos mínimos no README.
+- Sem servidor próprio: PAT no cliente; escopos mínimos no README (Actions: Read and write no fine-grained).
 - SOLID pragmático: um módulo/hook por responsabilidade; sem container de DI.
-- Testes só em lógica pura (`domain`, parse de backup, `repoLayout`) — Vitest.
+- Testes só em lógica pura (`domain`, parse de backup, `repoLayout`, parse de workflow YAML) — Vitest.
 - Markdown na descrição do PR (e preview das notas) via `react-markdown` + GFM.
 - Tema via `data-theme` + tokens CSS; preferência em `useTheme` / `storage/preferences`.
+- Poll leve (~15s) na aba Actions enquanto houver runs em andamento; refresh manual no resto.

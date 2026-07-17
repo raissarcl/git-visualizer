@@ -8,6 +8,7 @@ import {
   filterPullRequests,
   sortPinnedFirst,
   type AgeFilterDays,
+  type PeriodFilterDays,
   type PinSet,
   type PrNotesMap,
 } from '../domain/filters'
@@ -21,18 +22,19 @@ export function usePrFilters() {
   const [notesOnly, setNotesOnly] = useState(false)
   const [conflictOnly, setConflictOnly] = useState(false)
   const [minOpenDays, setMinOpenDays] = useState<AgeFilterDays>(0)
+  const [withinDays, setWithinDays] = useState<PeriodFilterDays>(0)
 
   const applyFilters = useCallback(
     (prs: PullRequest[], notes: PrNotesMap, pins: PinSet) => {
       const local = filterPullRequests(
         prs,
-        { query, notesOnly, conflictOnly, minOpenDays },
+        { query, notesOnly, conflictOnly, minOpenDays, withinDays },
         notes,
       )
 
       return sortPinnedFirst(local, pins)
     },
-    [query, notesOnly, conflictOnly, minOpenDays],
+    [query, notesOnly, conflictOnly, minOpenDays, withinDays],
   )
 
   return {
@@ -48,6 +50,8 @@ export function usePrFilters() {
     setConflictOnly,
     minOpenDays,
     setMinOpenDays,
+    withinDays,
+    setWithinDays,
     applyFilters,
   }
 }

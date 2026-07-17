@@ -1,7 +1,21 @@
 import { describe, expect, it } from 'vitest'
-import { filterByQuery, filterPullRequests, sortPinnedFirst } from './filters'
+import {
+  filterByQuery,
+  filterPullRequests,
+  isWithinDays,
+  sortPinnedFirst,
+  type LocalFilters,
+} from './filters'
 import type { PullRequest } from './pullRequest'
 import { prKey } from './prKey'
+
+const baseLocal: LocalFilters = {
+  query: '',
+  notesOnly: false,
+  conflictOnly: false,
+  minOpenDays: 0,
+  withinDays: 0,
+}
 
 function pr(partial: Partial<PullRequest> & Pick<PullRequest, 'number' | 'repo'>): PullRequest {
   return {
@@ -60,7 +74,7 @@ describe('filterPullRequests', () => {
     const notes = { [prKey('acme/a', 1)]: 'deploy sql' }
     const result = filterPullRequests(
       [old, fresh],
-      { query: '', notesOnly: true, conflictOnly: false, minOpenDays: 0 },
+      { ...baseLocal, notesOnly: true },
       notes,
     )
     expect(result.map((p) => p.number)).toEqual([1])
@@ -69,7 +83,7 @@ describe('filterPullRequests', () => {
   it('filters conflict only', () => {
     const result = filterPullRequests(
       [old, fresh],
-      { query: '', notesOnly: false, conflictOnly: true, minOpenDays: 0 },
+      { ...baseLocal, conflictOnly: true },
       {},
     )
     expect(result).toHaveLength(1)
@@ -79,10 +93,41 @@ describe('filterPullRequests', () => {
   it('filters open age', () => {
     const result = filterPullRequests(
       [old, fresh],
-      { query: '', notesOnly: false, conflictOnly: false, minOpenDays: 30 },
+      { ...baseLocal, minOpenDays: 30 },
       {},
     )
     expect(result.map((p) => p.number)).toEqual([1])
+  })
+
+  it('filters within recent period by updatedAt', () => {
+    const recent = pr({
+      repo: 'acme/a',
+      number: 3,
+      updatedAt: new Date().toISOString(),
+    })
+    const stale = pr({
+      repo: 'acme/a',
+      number: 4,
+      updatedAt: '2020-01-01T00:00:00Z',
+    })
+    const result = filterPullRequests(
+      [recent, stale],
+      { ...baseLocal, withinDays: 7 },
+      {},
+    )
+    expect(result.map((p) => p.number)).toEqual([3])
+  })
+})
+
+describe('isWithinDays', () => {
+  it('passes when filter off', () => {
+    expect(isWithinDays('2020-01-01T00:00:00Z', 0)).toBe(true)
+  })
+
+  it('checks 24h window', () => {
+    const now = Date.parse('2026-07-16T12:00:00Z')
+    expect(isWithinDays('2026-07-16T00:00:00Z', 1, now)).toBe(true)
+    expect(isWithinDays('2026-07-14T00:00:00Z', 1, now)).toBe(false)
   })
 })
 

@@ -260,14 +260,20 @@ export function removeReposFromFolder(
   return next
 }
 
+/**
+ * Repos visíveis na pasta e em toda a subárvore (subpastas).
+ * Associação direta (`isRepoInFolder`) continua valendo no organizer/sidebar.
+ */
 export function reposInFolder(
   layout: RepoLayout,
   folderId: string,
   allRepos: string[],
 ): string[] {
-  return allRepos.filter(
-    (r) => !isRepoHidden(layout, r) && isRepoInFolder(layout, r, folderId),
-  )
+  const subtree = collectSubtreeIds(layout, folderId)
+  return allRepos.filter((r) => {
+    if (isRepoHidden(layout, r)) return false
+    return folderIdsForRepo(layout, r).some((id) => subtree.has(id))
+  })
 }
 
 export type SidebarScope =

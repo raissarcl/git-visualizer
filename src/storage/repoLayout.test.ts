@@ -21,10 +21,18 @@ describe('repoLayout', () => {
 
     layout = addRepoToFolder(layout, 'acme/api', rootId)
     layout = addRepoToFolder(layout, 'acme/api', childId)
+    layout = addRepoToFolder(layout, 'acme/web', childId)
 
     expect(layout.foldersByRepo['acme/api']).toEqual([rootId, childId])
-    expect(reposInFolder(layout, rootId, ['acme/api', 'acme/web'])).toEqual(['acme/api'])
-    expect(reposInFolder(layout, childId, ['acme/api'])).toEqual(['acme/api'])
+    // Pasta pai inclui repos só da subpasta
+    expect(reposInFolder(layout, rootId, ['acme/api', 'acme/web', 'acme/cli'])).toEqual([
+      'acme/api',
+      'acme/web',
+    ])
+    expect(reposInFolder(layout, childId, ['acme/api', 'acme/web'])).toEqual([
+      'acme/api',
+      'acme/web',
+    ])
   })
 
   it('deleteFolder removes subtree and memberships', () => {
