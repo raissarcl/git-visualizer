@@ -4,7 +4,6 @@ import {
   actionNoteKey,
   canCancel,
   canRerun,
-  canRerunFailed,
   runBadgeKind,
   runBadgeLabel,
 } from '../domain/workflowRun'
@@ -12,7 +11,7 @@ import { hasNote } from '../storage/notes'
 import { ConfirmActionModal, type ConfirmDetailRow } from './ConfirmActionModal'
 import { SafeMarkdown } from './SafeMarkdown'
 
-type PendingAction = 'cancel' | 'rerun' | 'rerun-failed'
+type PendingAction = 'cancel' | 'rerun'
 
 interface ActionDetailProps {
   run: WorkflowRun | null
@@ -23,7 +22,6 @@ interface ActionDetailProps {
   onNoteChange: (key: string, text: string) => void
   onCancel: (run: WorkflowRun) => void
   onRerun: (run: WorkflowRun) => void
-  onRerunFailed: (run: WorkflowRun) => void
   onEnsureDetail: () => Promise<WorkflowRun | null>
   onClose: () => void
 }
@@ -55,7 +53,6 @@ export function ActionDetail({
   onNoteChange,
   onCancel,
   onRerun,
-  onRerunFailed,
   onEnsureDetail,
   onClose,
 }: ActionDetailProps) {
@@ -108,14 +105,6 @@ export function ActionDetail({
         details,
       }
     }
-    if (pending === 'rerun-failed') {
-      return {
-        title: 'Confirmar rerun failed',
-        subtitle: 'Reexecuta apenas os jobs que falharam',
-        confirmLabel: 'Confirmar rerun failed',
-        details,
-      }
-    }
     return {
       title: 'Confirmar rerun',
       subtitle: 'Reexecuta o workflow completo',
@@ -143,8 +132,7 @@ export function ActionDetail({
   const confirmPending = () => {
     if (!pending || confirmLoading) return
     if (pending === 'cancel') onCancel(run)
-    else if (pending === 'rerun') onRerun(run)
-    else onRerunFailed(run)
+    else onRerun(run)
     setPending(null)
   }
 
@@ -240,16 +228,6 @@ export function ActionDetail({
             onClick={() => openConfirm('rerun')}
           >
             Rerun
-          </button>
-        )}
-        {canRerunFailed(run) && (
-          <button
-            type="button"
-            className="btn"
-            disabled={mutating || confirmLoading}
-            onClick={() => openConfirm('rerun-failed')}
-          >
-            Rerun failed
           </button>
         )}
       </div>

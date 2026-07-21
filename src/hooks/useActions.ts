@@ -21,7 +21,6 @@ import {
   fetchWorkflowDispatchInputs,
   fetchWorkflowRun,
   fetchWorkflowRunJobs,
-  rerunFailedJobs,
   rerunWorkflow,
   type FolderRunsResult,
 } from '../github'
@@ -294,12 +293,6 @@ export function useActions(options: {
     [token, withMutation],
   )
 
-  const rerunFailed = useCallback(
-    (run: WorkflowRun) =>
-      withMutation('reexecutar jobs falhos', () => rerunFailedJobs(token, run.repo, run.id)),
-    [token, withMutation],
-  )
-
   const loadWorkflowsForRepo = useCallback(
     async (repoFullName: string): Promise<WorkflowSummary[]> => {
       if (!token) return []
@@ -364,7 +357,6 @@ export function useActions(options: {
     resetOnEmptyToken,
     cancelRun,
     rerun,
-    rerunFailed,
     loadWorkflowsForRepo,
     loadDefaultBranch,
     loadBranches,

@@ -328,7 +328,6 @@ export default function App() {
               onNoteChange={workspace.handleNoteChange}
               onCancel={actions.cancelRun}
               onRerun={actions.rerun}
-              onRerunFailed={actions.rerunFailed}
               onEnsureDetail={actions.ensureSelectedRunDetail}
               onClose={() => actions.selectRun(null)}
             />

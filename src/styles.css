@@ -1949,6 +1949,7 @@ body {
 
 .detail-jobs {
   margin-top: 1.25rem;
+  margin-bottom: 1rem;
   padding-top: 1rem;
   border-top: 1px solid var(--border);
 }
