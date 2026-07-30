@@ -9,6 +9,7 @@ import { loadNotes } from './notes'
 import { loadPins } from './pins'
 import { loadSidebarCollapsed } from './preferences'
 import { emptyLayout, loadRepoLayout, normalizeLayout } from './repoLayout'
+import { loadWorkspaceNotes } from './workspaceNotes'
 
 function mockLocalStorage() {
   const store = new Map<string, string>()
@@ -27,7 +28,7 @@ function mockLocalStorage() {
 }
 
 describe('parseBackupJson', () => {
-  it('parses a valid v1 backup', () => {
+  it('parses a valid v1 backup with empty workspaceNotes', () => {
     const raw = JSON.stringify({
       version: 1,
       exportedAt: '2026-07-14T12:00:00.000Z',
@@ -42,6 +43,35 @@ describe('parseBackupJson', () => {
     expect(data.pins.has('acme/api#1')).toBe(true)
     expect(data.sidebarCollapsed).toBe(true)
     expect(data.repoLayout.foldersByRepo).toEqual({})
+    expect(data.workspaceNotes).toEqual([])
+  })
+
+  it('parses a valid v2 backup with workspaceNotes', () => {
+    const raw = JSON.stringify({
+      version: 2,
+      exportedAt: '2026-07-30T12:00:00.000Z',
+      notes: {},
+      pins: [],
+      repoLayout: { folders: [], foldersByRepo: {}, hidden: [] },
+      sidebarCollapsed: false,
+      workspaceNotes: [
+        {
+          id: 'n1',
+          title: 'Scratch',
+          body: 'hello',
+          status: 'open',
+          pinned: false,
+          tags: [],
+          createdAt: '2026-07-30T00:00:00.000Z',
+          updatedAt: '2026-07-30T00:00:00.000Z',
+          link: { type: 'none' },
+        },
+      ],
+    })
+
+    const data = parseBackupJson(raw)
+    expect(data.workspaceNotes).toHaveLength(1)
+    expect(data.workspaceNotes[0]?.title).toBe('Scratch')
   })
 
   it('migrates legacy folderByRepo on import', () => {
@@ -81,7 +111,7 @@ describe('clearLocalData', () => {
     mockLocalStorage()
   })
 
-  it('wipes notes, pins, layout and sidebar without touching token', () => {
+  it('wipes notes, pins, layout, workspace notes and sidebar without touching token', () => {
     localStorage.setItem('gh_pat', 'ghp_secret')
     applyImportedData({
       notes: { 'acme/api#1': 'note' },
@@ -92,6 +122,19 @@ describe('clearLocalData', () => {
         hidden: ['acme/legacy'],
       },
       sidebarCollapsed: true,
+      workspaceNotes: [
+        {
+          id: 'n1',
+          title: 'x',
+          body: '',
+          status: 'open',
+          pinned: false,
+          tags: [],
+          createdAt: '2026-01-01T00:00:00.000Z',
+          updatedAt: '2026-01-01T00:00:00.000Z',
+          link: { type: 'none' },
+        },
+      ],
     })
 
     const cleared = clearLocalData()
@@ -100,12 +143,16 @@ describe('clearLocalData', () => {
     expect(cleared.pins.size).toBe(0)
     expect(cleared.repoLayout).toEqual(emptyLayout())
     expect(cleared.sidebarCollapsed).toBe(false)
+    expect(cleared.workspaceNotes).toEqual([])
     expect(loadNotes()).toEqual({})
     expect(loadPins().size).toBe(0)
     expect(loadRepoLayout()).toEqual(emptyLayout())
     expect(loadSidebarCollapsed()).toBe(false)
+    expect(loadWorkspaceNotes()).toEqual([])
     expect(localStorage.getItem('gh_pat')).toBe('ghp_secret')
     expect(buildLocalBackup().pins).toEqual([])
+    expect(buildLocalBackup().version).toBe(2)
+    expect(buildLocalBackup().workspaceNotes).toEqual([])
   })
 })
 

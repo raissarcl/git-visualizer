@@ -45,6 +45,21 @@ async function parseError(res: Response): Promise<never> {
 
 /**
  * GET JSON autenticado.
+ * @returns `null` em 404; lança em outros erros.
+ */
+export async function restGetOrNull<T>(token: string, path: string): Promise<T | null> {
+  const res = await fetch(`${GITHUB_API}${path}`, {
+    method: 'GET',
+    headers: authHeaders(token),
+  })
+
+  if (res.status === 404) return null
+  if (!res.ok) await parseError(res)
+  return (await res.json()) as T
+}
+
+/**
+ * GET JSON autenticado.
  * @throws Error em 401/403/HTTP não-OK
  */
 export async function restGet<T>(token: string, path: string): Promise<T> {

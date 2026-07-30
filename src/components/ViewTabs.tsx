@@ -1,4 +1,4 @@
-export type AppView = 'prs' | 'actions'
+export type AppView = 'prs' | 'actions' | 'notes'
 
 interface ViewTabsProps {
   view: AppView
@@ -25,6 +25,15 @@ export function ViewTabs({ view, onChange }: ViewTabsProps) {
         onClick={() => onChange('actions')}
       >
         Actions
+      </button>
+      <button
+        type="button"
+        role="tab"
+        aria-selected={view === 'notes'}
+        className={`view-tab${view === 'notes' ? ' is-active' : ''}`}
+        onClick={() => onChange('notes')}
+      >
+        Notas
       </button>
     </div>
   )

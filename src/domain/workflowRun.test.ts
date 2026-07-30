@@ -8,6 +8,7 @@ import {
   isBranchLikeInput,
   mergeWorkflowRunDetail,
   runBadgeKind,
+  runBadgeLabel,
   runKey,
   sortRunsByCreatedDesc,
   sortRunsFailedFirst,
@@ -113,6 +114,32 @@ describe('runBadgeKind', () => {
     expect(
       runBadgeKind(run({ id: 1, repo: 'a/b', status: 'completed', conclusion: 'failure' })),
     ).toBe('failure')
+  })
+
+  it('ignores stale conclusion while still queued/pending', () => {
+    expect(
+      runBadgeKind(run({ id: 1, repo: 'a/b', status: 'queued', conclusion: 'success' })),
+    ).toBe('queued')
+    expect(
+      runBadgeKind(run({ id: 1, repo: 'a/b', status: 'pending', conclusion: 'success' })),
+    ).toBe('queued')
+    expect(
+      runBadgeKind(run({ id: 1, repo: 'a/b', status: 'requested', conclusion: 'failure' })),
+    ).toBe('queued')
+  })
+})
+
+describe('runBadgeLabel', () => {
+  it('labels waiting distinctly from queued and in progress', () => {
+    expect(
+      runBadgeLabel(run({ id: 1, repo: 'a/b', status: 'waiting', conclusion: null })),
+    ).toBe('aguardando')
+    expect(
+      runBadgeLabel(run({ id: 1, repo: 'a/b', status: 'queued', conclusion: null })),
+    ).toBe('na fila')
+    expect(
+      runBadgeLabel(run({ id: 1, repo: 'a/b', status: 'in_progress', conclusion: null })),
+    ).toBe('em andamento')
   })
 })
 

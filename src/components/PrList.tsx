@@ -3,6 +3,7 @@ import { prKey } from '../domain/prKey'
 import type { PullRequest } from '../domain/pullRequest'
 import { hasNote } from '../storage/notes'
 import { isPinned } from '../storage/pins'
+import { CopyableCode } from './CopyableCode'
 
 interface PrListProps {
   prs: PullRequest[]
@@ -98,18 +99,22 @@ export function PrList({
                     <span className="pr-author">{pr.authorLogin}</span>
                   </td>
                   <td className="col-repo">
-                    <code title={pr.repo}>{pr.repo}</code>
+                    <CopyableCode value={pr.repo} title={pr.repo} />
                   </td>
                   <td className="col-branches">
-                    <code className="branch" title={pr.headRefName}>
-                      {pr.headRefName}
-                    </code>
+                    <CopyableCode
+                      value={pr.headRefName}
+                      className="branch"
+                      title={pr.headRefName}
+                    />
                     <span className="branch-arrow" aria-hidden="true">
                       →
                     </span>
-                    <code className="branch" title={pr.baseRefName}>
-                      {pr.baseRefName}
-                    </code>
+                    <CopyableCode
+                      value={pr.baseRefName}
+                      className="branch"
+                      title={pr.baseRefName}
+                    />
                   </td>
                   <td className="col-state">
                     <span className={`badge badge-${pr.state.toLowerCase()}`}>{pr.state}</span>

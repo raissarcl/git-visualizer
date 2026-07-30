@@ -1,3 +1,5 @@
+import { createPortal } from 'react-dom'
+
 export interface ConfirmDetailRow {
   label: string
   value: string
@@ -8,8 +10,16 @@ interface ConfirmActionModalProps {
   open: boolean
   title: string
   subtitle?: string
-  details: ConfirmDetailRow[]
+  details?: ConfirmDetailRow[]
+  /** Texto acima dos detalhes; `null` omite. */
+  lead?: string | null
   confirmLabel?: string
+  cancelLabel?: string
+  /** Ação terciária (ex.: fechar sem salvar). */
+  secondaryLabel?: string
+  onSecondary?: () => void
+  /** Visual do botão confirmar (excluir = danger). */
+  tone?: 'default' | 'danger'
   busy?: boolean
   onConfirm: () => void
   onCancel: () => void
@@ -19,15 +29,20 @@ export function ConfirmActionModal({
   open,
   title,
   subtitle,
-  details,
+  details = [],
+  lead = 'Revise os dados antes de continuar:',
   confirmLabel = 'Confirmar',
+  cancelLabel = 'Voltar',
+  secondaryLabel,
+  onSecondary,
+  tone = 'default',
   busy = false,
   onConfirm,
   onCancel,
 }: ConfirmActionModalProps) {
   if (!open) return null
 
-  return (
+  const modal = (
     <div className="org-overlay confirm-overlay" role="presentation" onClick={onCancel}>
       <div
         className="org-modal confirm-modal"
@@ -53,24 +68,36 @@ export function ConfirmActionModal({
         </header>
 
         <div className="confirm-body">
-          <p className="confirm-lead">Revise os dados antes de continuar:</p>
-          <dl className="confirm-details">
-            {details.map((row) => (
-              <div key={row.label} className="confirm-details-row">
-                <dt>{row.label}</dt>
-                <dd className={row.mono ? 'is-mono' : undefined}>{row.value || '—'}</dd>
-              </div>
-            ))}
-          </dl>
+          {lead != null && lead !== '' ? <p className="confirm-lead">{lead}</p> : null}
+          {details.length > 0 ? (
+            <dl className="confirm-details">
+              {details.map((row) => (
+                <div key={row.label} className="confirm-details-row">
+                  <dt>{row.label}</dt>
+                  <dd className={row.mono ? 'is-mono' : undefined}>{row.value || '—'}</dd>
+                </div>
+              ))}
+            </dl>
+          ) : null}
         </div>
 
-        <footer className="org-footer">
+        <footer className="org-footer confirm-footer">
           <button type="button" className="btn" onClick={onCancel} disabled={busy}>
-            Voltar
+            {cancelLabel}
           </button>
+          {secondaryLabel && onSecondary ? (
+            <button
+              type="button"
+              className="btn"
+              onClick={onSecondary}
+              disabled={busy}
+            >
+              {secondaryLabel}
+            </button>
+          ) : null}
           <button
             type="button"
-            className="btn btn-primary"
+            className={`btn${tone === 'danger' ? ' btn-confirm-danger' : ' btn-primary'}`}
             onClick={onConfirm}
             disabled={busy}
           >
@@ -80,4 +107,6 @@ export function ConfirmActionModal({
       </div>
     </div>
   )
+
+  return createPortal(modal, document.body)
 }

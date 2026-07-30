@@ -202,7 +202,18 @@ export function SearchableSelect({
     >
       {filtered.length === 0 ? (
         <li className="search-select-empty" role="presentation">
-          {allowCustom && query.trim() ? `Usar “${query.trim()}”` : emptyLabel}
+          {allowCustom && query.trim() ? (
+            <button
+              type="button"
+              className="search-select-option is-active"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => commitValue(query.trim())}
+            >
+              {`Usar “${query.trim()}”`}
+            </button>
+          ) : (
+            emptyLabel
+          )}
         </li>
       ) : (
         filtered.map((opt, i) => (

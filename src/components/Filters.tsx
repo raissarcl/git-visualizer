@@ -3,8 +3,8 @@ import type { AgeFilterDays, PeriodFilterDays } from '../domain/filters'
 import type { StateFilter } from '../domain/pullRequest'
 
 interface FiltersProps {
-  /** Na aba Actions, esconde filtros de PR e mantém só backup. */
-  mode?: 'prs' | 'actions'
+  /** Na aba Actions/Notas, esconde filtros de PR e mantém só backup. */
+  mode?: 'prs' | 'actions' | 'notes'
   mineOnly: boolean
   onMineOnlyChange: (value: boolean) => void
   state: StateFilter
@@ -58,7 +58,7 @@ export function Filters({
 
   const handleClear = () => {
     const ok = window.confirm(
-      'Limpar notas, pins e pastas deste navegador?\n\nO token e o tema não serão removidos.',
+      'Limpar notas, pins, pastas e notas de workspace deste navegador?\n\nO token e o tema não serão removidos.',
     )
     if (!ok) return
     onClearLocalData()
@@ -170,7 +170,7 @@ export function Filters({
       <details className="filters-details">
         <summary>Backup local</summary>
         <div className="filters-details-body">
-          <p className="filters-backup-hint">Notas, pins e pastas · sem token</p>
+          <p className="filters-backup-hint">Notas, pins, pastas e notas de workspace · sem token</p>
           <div className="filters-backup-actions">
             <button type="button" className="btn-backup" onClick={onExport}>
               Exportar

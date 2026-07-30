@@ -1,8 +1,11 @@
-import { useMemo, useState } from 'react'
+import { useCallback, useMemo, useRef, useState } from 'react'
 import { ActionDetail } from './components/ActionDetail'
 import { ActionsList } from './components/ActionsList'
+import { ConfirmActionModal } from './components/ConfirmActionModal'
 import { DispatchModal } from './components/DispatchModal'
 import { Filters } from './components/Filters'
+import { NoteDetail } from './components/NoteDetail'
+import { NotesList } from './components/NotesList'
 import { PrDetail } from './components/PrDetail'
 import { PrList } from './components/PrList'
 import { RepoList } from './components/RepoList'
@@ -17,6 +20,16 @@ import {
   runKey,
   type ActionsStatusFilter,
 } from './domain/workflowRun'
+import {
+  createWorkspaceNote,
+  filterWorkspaceNotes,
+  findMatchingPr,
+  linkBadgeLabel,
+  noteListTitle,
+  type LocalWorkspaceNoteFilters,
+  type NotesScopeFilter,
+} from './domain/workspaceNote'
+import { checkRepoBranch, fetchRepoBranches } from './github'
 import { useActions } from './hooks/useActions'
 import { useAuth } from './hooks/useAuth'
 import { useLocalWorkspace } from './hooks/useLocalWorkspace'
@@ -24,8 +37,27 @@ import { usePrFilters } from './hooks/usePrFilters'
 import { usePullRequests } from './hooks/usePullRequests'
 import { useTheme } from './hooks/useTheme'
 import { isPinned } from './storage/pins'
-import { reposInFolder, toggleFolderCollapsed } from './storage/repoLayout'
+import {
+  reposInFolder,
+  toggleFolderCollapsed,
+  type SidebarScope,
+} from './storage/repoLayout'
 import './styles.css'
+
+const DEFAULT_NOTE_FILTERS: LocalWorkspaceNoteFilters = {
+  query: '',
+  status: 'open',
+  pinnedOnly: false,
+  tag: '',
+  linkType: 'all',
+  unverifiedOnly: false,
+  excludeGeneral: false,
+}
+
+type NoteNavPending =
+  | { kind: 'select'; nextId: string | null }
+  | { kind: 'create' }
+  | { kind: 'scope'; next: SidebarScope }
 
 /**
  * Shell da aplicação: compõe hooks de auth, dados remotos, workspace local e UI.
@@ -41,6 +73,12 @@ export default function App() {
   const [actionsWithinDays, setActionsWithinDays] = useState<PeriodFilterDays>(0)
   const [actionsNotesOnly, setActionsNotesOnly] = useState(false)
   const [dispatchOpen, setDispatchOpen] = useState(false)
+  const [noteFilters, setNoteFilters] =
+    useState<LocalWorkspaceNoteFilters>(DEFAULT_NOTE_FILTERS)
+  const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null)
+  const [noteNavPending, setNoteNavPending] = useState<NoteNavPending | null>(null)
+  const noteDirtyRef = useRef(false)
+  const noteSaveRef = useRef<(() => void) | null>(null)
 
   const prData = usePullRequests({
     token: auth.token,
@@ -82,6 +120,45 @@ export default function App() {
     ],
   )
 
+  const notesScopeFilter: NotesScopeFilter = useMemo(() => {
+    if (workspace.scope.type === 'network') return { type: 'network' }
+    if (workspace.scope.type === 'repo') {
+      return {
+        type: 'repos',
+        repos: [workspace.scope.name],
+        excludeGeneral: noteFilters.excludeGeneral,
+      }
+    }
+    return {
+      type: 'repos',
+      repos: reposInFolder(workspace.layout, workspace.scope.id, prData.viewerRepos),
+      excludeGeneral: noteFilters.excludeGeneral,
+    }
+  }, [workspace.scope, workspace.layout, prData.viewerRepos, noteFilters.excludeGeneral])
+
+  const filteredNotes = useMemo(
+    () => filterWorkspaceNotes(workspace.workspaceNotes, noteFilters, notesScopeFilter),
+    [workspace.workspaceNotes, noteFilters, notesScopeFilter],
+  )
+
+  const selectedNote = useMemo(
+    () => workspace.workspaceNotes.find((n) => n.id === selectedNoteId) ?? null,
+    [workspace.workspaceNotes, selectedNoteId],
+  )
+
+  const noteTagOptions = useMemo(() => {
+    const set = new Set<string>()
+    for (const n of workspace.workspaceNotes) {
+      for (const t of n.tags) set.add(t)
+    }
+    return [...set].sort((a, b) => a.localeCompare(b))
+  }, [workspace.workspaceNotes])
+
+  const suggestedPr = useMemo(
+    () => (selectedNote ? findMatchingPr(selectedNote, prData.prs) : null),
+    [selectedNote, prData.prs],
+  )
+
   const selectedListId = prData.selectedPr
     ? prKey(prData.selectedPr.repo, prData.selectedPr.number)
     : null
@@ -108,13 +185,38 @@ export default function App() {
     return []
   }, [workspace.scope, workspace.layout, prData.viewerRepos])
 
+  /** Repos oferecidos no vínculo da nota — respeita escopo (rede = todos). */
+  const noteRepos = useMemo(() => {
+    if (workspace.scope.type === 'repo') return [workspace.scope.name]
+    if (workspace.scope.type === 'folder') {
+      return reposInFolder(workspace.layout, workspace.scope.id, prData.viewerRepos)
+    }
+    return prData.viewerRepos
+  }, [workspace.scope, workspace.layout, prData.viewerRepos])
+
   const dispatchInitialRepo =
     workspace.scope.type === 'repo'
       ? workspace.scope.name
       : (actions.selectedRun?.repo ?? dispatchRepos[0] ?? null)
 
-  const headerError = view === 'actions' ? actions.error : prData.error
-  const loading = view === 'actions' ? actions.loading : prData.loading
+  const headerError = view === 'actions' ? actions.error : view === 'prs' ? prData.error : null
+  const loading = view === 'actions' ? actions.loading : view === 'prs' ? prData.loading : false
+
+  const loadNoteBranches = useCallback(
+    async (repo: string) => {
+      if (!auth.token) return []
+      return fetchRepoBranches(auth.token, repo)
+    },
+    [auth.token],
+  )
+
+  const checkNoteBranch = useCallback(
+    async (repo: string, branch: string) => {
+      if (!auth.token) throw new Error('Salve um Personal Access Token para verificar branches.')
+      return checkRepoBranch(auth.token, repo, branch)
+    },
+    [auth.token],
+  )
 
   const handleSave = () => {
     const next = auth.save()
@@ -131,10 +233,38 @@ export default function App() {
     actions.resetOnEmptyToken()
   }
 
-  const handleSelectScope = (next: Parameters<typeof workspace.selectScope>[0]) => {
+  const applyScopeChange = (next: SidebarScope) => {
     workspace.selectScope(next)
     prData.setSelectedPr(null)
     actions.selectRun(null)
+    setSelectedNoteId(null)
+  }
+
+  const createBlankNote = () => {
+    const link =
+      workspace.scope.type === 'repo'
+        ? ({ type: 'repo' as const, repo: workspace.scope.name })
+        : ({ type: 'none' as const })
+    const note = createWorkspaceNote({ link })
+    workspace.upsertNote(note)
+    setSelectedNoteId(note.id)
+  }
+
+  const handleSelectScope = (next: SidebarScope) => {
+    if (view === 'notes' && noteDirtyRef.current && selectedNoteId) {
+      setNoteNavPending({ kind: 'scope', next })
+      return
+    }
+    applyScopeChange(next)
+  }
+
+  const selectNoteId = (nextId: string | null) => {
+    if (nextId === selectedNoteId) return
+    if (noteDirtyRef.current && selectedNoteId) {
+      setNoteNavPending({ kind: 'select', nextId })
+      return
+    }
+    setSelectedNoteId(nextId)
   }
 
   const handleRefresh = () => {
@@ -142,7 +272,49 @@ export default function App() {
     else prData.refresh()
   }
 
+  const handleCreateNote = () => {
+    if (noteDirtyRef.current && selectedNoteId) {
+      setNoteNavPending({ kind: 'create' })
+      return
+    }
+    createBlankNote()
+  }
+
+  const confirmNoteNav = () => {
+    if (!noteNavPending) return
+    noteSaveRef.current?.()
+    noteDirtyRef.current = false
+    const pending = noteNavPending
+    setNoteNavPending(null)
+    if (pending.kind === 'select') setSelectedNoteId(pending.nextId)
+    else if (pending.kind === 'create') createBlankNote()
+    else applyScopeChange(pending.next)
+  }
+
+  const discardNoteNav = () => {
+    if (!noteNavPending) return
+    noteDirtyRef.current = false
+    const pending = noteNavPending
+    setNoteNavPending(null)
+    if (pending.kind === 'select') setSelectedNoteId(pending.nextId)
+    else if (pending.kind === 'create') createBlankNote()
+    else applyScopeChange(pending.next)
+  }
+
+  const handleDeleteNote = (id: string) => {
+    workspace.deleteNote(id)
+    noteDirtyRef.current = false
+    setSelectedNoteId((cur) => (cur === id ? null : cur))
+  }
+
   const actionsNetworkHint = view === 'actions' && workspace.scope.type === 'network'
+
+  const loadedCount =
+    view === 'actions'
+      ? actions.runs.length
+      : view === 'notes'
+        ? filteredNotes.length
+        : prData.prs.length
 
   return (
     <div className="app">
@@ -177,10 +349,10 @@ export default function App() {
                 workspace.updateLayout(toggleFolderCollapsed(workspace.layout, id))
               }
               onOrganize={() => workspace.setOrganizerOpen(true)}
-              loadedCount={view === 'actions' ? actions.runs.length : prData.prs.length}
+              loadedCount={loadedCount}
             />
             <Filters
-              mode={view}
+              mode={view === 'notes' ? 'notes' : view}
               mineOnly={filters.mineOnly}
               onMineOnlyChange={filters.setMineOnly}
               state={filters.stateFilter}
@@ -225,6 +397,7 @@ export default function App() {
               <p className="main-scope">
                 Repo: <code>{workspace.scope.name}</code>
                 {view === 'prs' && !filters.mineOnly && ' · todos os autores'}
+                {view === 'notes' && ' · notas do repo + gerais'}
               </p>
             ) : workspace.scope.type === 'folder' ? (
               <p className="main-scope">
@@ -235,7 +408,9 @@ export default function App() {
               <p className="main-scope">
                 {view === 'actions'
                   ? 'Selecione um repo ou uma pasta para ver Actions.'
-                  : 'Sua rede (somente você). Selecione um repo ou uma pasta.'}
+                  : view === 'notes'
+                    ? 'Todas as notas do workspace.'
+                    : 'Sua rede (somente você). Selecione um repo ou uma pasta.'}
               </p>
             )}
 
@@ -243,7 +418,21 @@ export default function App() {
           </div>
 
           <div className="main-content">
-            {!auth.token && !loading ? (
+            {view === 'notes' ? (
+              <NotesList
+                notes={filteredNotes}
+                selectedId={selectedNoteId}
+                onSelect={(n) => selectNoteId(n.id)}
+                onCreate={handleCreateNote}
+                onDelete={handleDeleteNote}
+                filters={noteFilters}
+                onFiltersChange={(patch) =>
+                  setNoteFilters((prev) => ({ ...prev, ...patch }))
+                }
+                tagOptions={noteTagOptions}
+                showExcludeGeneral={workspace.scope.type !== 'network'}
+              />
+            ) : !auth.token && !loading ? (
               <div className="graph-empty">
                 <p>
                   Cole um Personal Access Token acima e clique em <strong>Salvar</strong> para
@@ -312,7 +501,7 @@ export default function App() {
               onTogglePin={workspace.handleTogglePin}
               onClose={() => prData.setSelectedPr(null)}
             />
-          ) : (
+          ) : view === 'actions' ? (
             <ActionDetail
               run={actions.selectedRun}
               jobs={actions.jobs}
@@ -330,6 +519,25 @@ export default function App() {
               onRerun={actions.rerun}
               onEnsureDetail={actions.ensureSelectedRunDetail}
               onClose={() => actions.selectRun(null)}
+            />
+          ) : (
+            <NoteDetail
+              note={selectedNote}
+              repos={noteRepos}
+              token={auth.token}
+              suggestedPr={suggestedPr}
+              loadBranches={loadNoteBranches}
+              checkBranch={checkNoteBranch}
+              onChange={workspace.upsertNote}
+              onDelete={handleDeleteNote}
+              onClose={() => {
+                noteDirtyRef.current = false
+                setSelectedNoteId(null)
+              }}
+              onDirtyChange={(d) => {
+                noteDirtyRef.current = d
+              }}
+              saveHandlerRef={noteSaveRef}
             />
           )}
         </section>
@@ -354,6 +562,36 @@ export default function App() {
         loadInputs={actions.loadDispatchInputs}
         onDispatch={actions.dispatch}
         busy={actions.mutating}
+      />
+
+      <ConfirmActionModal
+        open={noteNavPending != null}
+        title="Salvar nota"
+        subtitle="Há alterações não salvas. Salvar antes de continuar?"
+        details={
+          selectedNote
+            ? [
+                { label: 'Título', value: noteListTitle(selectedNote) },
+                {
+                  label: 'Vínculo',
+                  value: linkBadgeLabel(selectedNote.link),
+                  mono: true,
+                },
+              ]
+            : []
+        }
+        confirmLabel={
+          noteNavPending?.kind === 'create'
+            ? 'Salvar e criar nova'
+            : noteNavPending?.kind === 'scope'
+              ? 'Salvar e mudar escopo'
+              : 'Salvar e continuar'
+        }
+        cancelLabel="Continuar editando"
+        secondaryLabel="Continuar sem salvar"
+        onSecondary={discardNoteNav}
+        onConfirm={confirmNoteNav}
+        onCancel={() => setNoteNavPending(null)}
       />
     </div>
   )

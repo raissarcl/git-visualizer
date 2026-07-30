@@ -2,6 +2,12 @@ import { useEffect, useState } from 'react'
 import { prKey } from '../domain/prKey'
 import type { PullRequest } from '../domain/pullRequest'
 import { hasNote } from '../storage/notes'
+import { copyText } from '../lib/clipboard'
+import { useCopiedFeedback } from '../hooks/useCopiedFeedback'
+import { CopiedTooltip } from './CopiedTooltip'
+import { CopyableCode } from './CopyableCode'
+import { CopyMarkdownButton } from './CopyMarkdownButton'
+import { DetailDrawer } from './DetailDrawer'
 import { SafeMarkdown } from './SafeMarkdown'
 
 interface PrDetailProps {
@@ -20,78 +26,37 @@ function formatDate(iso: string): string {
   })
 }
 
-async function copyText(value: string): Promise<boolean> {
-  try {
-    await navigator.clipboard.writeText(value)
-    return true
-  } catch {
-    return false
-  }
-}
-
 function CopyBranch({ label, value }: { label: string; value: string }) {
-  const [copied, setCopied] = useState(false)
-
-  const copy = async () => {
-    if (!(await copyText(value))) return
-    setCopied(true)
-    window.setTimeout(() => setCopied(false), 1500)
-  }
-
   return (
     <div className="copy-branch">
       <span className="copy-branch-label">{label}</span>
-      <code title={value}>{value}</code>
-      <button type="button" className="btn-copy" onClick={() => { copy() }} title="Copiar">
-        {copied ? 'Copiado!' : 'Copiar'}
-      </button>
+      <CopyableCode value={value} className="branch" />
     </div>
   )
 }
 
 function CopyGithubLink({ url }: { url: string }) {
-  const [copied, setCopied] = useState(false)
+  const { copied, flash } = useCopiedFeedback()
 
   const copy = async () => {
     if (!(await copyText(url))) return
-    setCopied(true)
-    window.setTimeout(() => setCopied(false), 1500)
+    flash()
   }
 
   return (
-    <button
-      type="button"
-      className="btn"
-      onClick={() => {
-        copy()
-      }}
-      title="Copiar link do GitHub"
-    >
-      {copied ? 'Copiado!' : 'Copiar link'}
-    </button>
-  )
-}
-
-function CopyMarkdown({ value }: { value: string }) {
-  const [copied, setCopied] = useState(false)
-
-  const copy = async () => {
-    if (!(await copyText(value))) return
-    setCopied(true)
-    window.setTimeout(() => setCopied(false), 1500)
-  }
-
-  return (
-    <button
-      type="button"
-      className="btn-copy"
-      onClick={() => {
-        copy()
-      }}
-      title="Copiar descrição em markdown"
-    >
-      {copied ? 'Copiado!' : 'Copiar markdown'}
-    </button>
+    <span className="copy-feedback-wrap">
+      <button
+        type="button"
+        className="btn"
+        onClick={() => {
+          void copy()
+        }}
+        title="Copiar link do GitHub"
+      >
+        Copiar link
+      </button>
+      <CopiedTooltip show={copied} />
+    </span>
   )
 }
 
@@ -125,7 +90,7 @@ export function PrDetail({
   }
 
   return (
-    <aside className="detail-drawer scrollable" aria-label="Detalhe do PR">
+    <DetailDrawer aria-label="Detalhe do PR" onClose={onClose}>
       <div className="detail-toolbar">
         <button
           type="button"
@@ -184,7 +149,12 @@ export function PrDetail({
       <div className="detail-body">
         <div className="detail-body-heading">
           <h3>Descrição</h3>
-          {pr.body ? <CopyMarkdown value={pr.body} /> : null}
+          {pr.body ? (
+            <CopyMarkdownButton
+              value={pr.body}
+              title="Copiar descrição em markdown"
+            />
+          ) : null}
         </div>
         {pr.body ? (
           <div className="detail-body-md scrollable">
@@ -199,6 +169,7 @@ export function PrDetail({
         <div className="detail-notes-heading">
           <h3>Notas</h3>
           {noteFilled && <span className="note-badge" title="Tem nota local">nota</span>}
+          <CopyMarkdownButton value={draft} title="Copiar nota em markdown" />
           <div className="notes-mode-tabs" role="tablist" aria-label="Modo das notas">
             <button
               type="button"
@@ -255,6 +226,6 @@ export function PrDetail({
         </a>
         <CopyGithubLink url={pr.url} />
       </div>
-    </aside>
+    </DetailDrawer>
   )
 }

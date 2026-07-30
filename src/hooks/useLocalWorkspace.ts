@@ -1,8 +1,9 @@
 /**
- * Dados locais do visualizador: notes, pins, layout, sidebar, backup.
+ * Dados locais do visualizador: notes, pins, layout, sidebar, workspace notes, backup.
  */
 
 import { useCallback, useState } from 'react'
+import type { WorkspaceNote } from '../domain/workspaceNote'
 import {
   applyImportedData,
   clearLocalData,
@@ -22,6 +23,12 @@ import {
   type RepoLayout,
   type SidebarScope,
 } from '../storage/repoLayout'
+import {
+  loadWorkspaceNotes,
+  removeWorkspaceNote,
+  saveWorkspaceNotes,
+  upsertWorkspaceNote,
+} from '../storage/workspaceNotes'
 
 function clampScope(scope: SidebarScope, layout: RepoLayout): SidebarScope {
   if (scope.type === 'repo' && isRepoHidden(layout, scope.name)) {
@@ -42,6 +49,9 @@ export function useLocalWorkspace() {
 
   const [notes, setNotes] = useState<PrNotesMap>(() => loadNotes())
   const [pins, setPins] = useState<PinSet>(() => loadPins())
+  const [workspaceNotes, setWorkspaceNotes] = useState<WorkspaceNote[]>(() =>
+    loadWorkspaceNotes(),
+  )
   const [scope, setScope] = useState<SidebarScope>({ type: 'network' })
 
   const toggleSidebar = useCallback(() => {
@@ -68,6 +78,22 @@ export function useLocalWorkspace() {
     })
   }, [])
 
+  const upsertNote = useCallback((note: WorkspaceNote) => {
+    setWorkspaceNotes((prev) => {
+      const next = upsertWorkspaceNote(prev, note)
+      saveWorkspaceNotes(next)
+      return next
+    })
+  }, [])
+
+  const deleteNote = useCallback((id: string) => {
+    setWorkspaceNotes((prev) => {
+      const next = removeWorkspaceNote(prev, id)
+      saveWorkspaceNotes(next)
+      return next
+    })
+  }, [])
+
   const updateLayout = useCallback((next: RepoLayout) => {
     setLayout(next)
     saveRepoLayout(next)
@@ -84,6 +110,7 @@ export function useLocalWorkspace() {
     setPins(data.pins)
     setLayout(data.repoLayout)
     setSidebarCollapsed(data.sidebarCollapsed)
+    setWorkspaceNotes(data.workspaceNotes)
     setScope((current) => clampScope(current, data.repoLayout))
   }, [])
 
@@ -93,6 +120,7 @@ export function useLocalWorkspace() {
     setPins(data.pins)
     setLayout(data.repoLayout)
     setSidebarCollapsed(data.sidebarCollapsed)
+    setWorkspaceNotes(data.workspaceNotes)
     setScope({ type: 'network' })
   }, [])
 
@@ -109,6 +137,9 @@ export function useLocalWorkspace() {
     toggleSidebar,
     notes,
     pins,
+    workspaceNotes,
+    upsertNote,
+    deleteNote,
     handleNoteChange,
     handleTogglePin,
     scope,

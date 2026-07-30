@@ -9,6 +9,8 @@ import {
 } from '../domain/workflowRun'
 import { hasNote } from '../storage/notes'
 import { ConfirmActionModal, type ConfirmDetailRow } from './ConfirmActionModal'
+import { CopyableCode } from './CopyableCode'
+import { DetailDrawer } from './DetailDrawer'
 import { SafeMarkdown } from './SafeMarkdown'
 
 type PendingAction = 'cancel' | 'rerun'
@@ -118,6 +120,17 @@ export function ActionDetail({
   const key = actionNoteKey(run.repo, run.id)
   const noteFilled = hasNote({ [key]: draft }, key)
   const kind = runBadgeKind(run)
+  const branchRef =
+    pickRunInput(run.inputs, [
+      'ref',
+      'branch',
+      'git_ref',
+      'source_branch',
+      'from_branch',
+      'source',
+    ]) ||
+    run.headBranch ||
+    ''
 
   const persist = (text: string) => {
     onNoteChange(key, text)
@@ -138,7 +151,7 @@ export function ActionDetail({
 
   return (
     <>
-    <aside className="detail-drawer scrollable" aria-label="Detalhe do run">
+    <DetailDrawer aria-label="Detalhe do run" onClose={onClose}>
       <div className="detail-toolbar">
         <button type="button" className="detail-close" onClick={onClose} aria-label="Fechar">
           ×
@@ -159,18 +172,11 @@ export function ActionDetail({
         <div>
           <dt>Branch ref</dt>
           <dd>
-            <code>
-              {pickRunInput(run.inputs, [
-                'ref',
-                'branch',
-                'git_ref',
-                'source_branch',
-                'from_branch',
-                'source',
-              ]) ||
-                run.headBranch ||
-                '—'}
-            </code>
+            {branchRef.trim() ? (
+              <CopyableCode value={branchRef} className="branch" />
+            ) : (
+              <span className="note-cell-empty">—</span>
+            )}
           </dd>
         </div>
         <div>
@@ -304,7 +310,7 @@ export function ActionDetail({
           <p className="detail-body-empty">Nada para pré-visualizar.</p>
         )}
       </div>
-    </aside>
+    </DetailDrawer>
 
     <ConfirmActionModal
       open={pending != null}

@@ -148,13 +148,30 @@ export function canRerunFailed(run: Pick<WorkflowRun, 'status' | 'conclusion'>):
   )
 }
 
-/** Badge visual: prioriza conclusion quando completed. */
+/**
+ * Badge visual.
+ * Conclusion só vale com status `completed` — a API às vezes deixa conclusion
+ * antiga em runs re-enfileirados; sem esse guard, "sucesso" e "na fila" se misturam.
+ */
 export function runBadgeKind(
   run: Pick<WorkflowRun, 'status' | 'conclusion'>,
 ): 'success' | 'failure' | 'cancelled' | 'in_progress' | 'queued' | 'neutral' {
-  if (isRunInProgress(run)) {
-    return run.status === 'queued' || run.status === 'pending' ? 'queued' : 'in_progress'
+  if (
+    run.status === 'queued' ||
+    run.status === 'pending' ||
+    run.status === 'requested'
+  ) {
+    return 'queued'
   }
+  if (
+    run.status === 'in_progress' ||
+    run.status === 'waiting' ||
+    run.status === 'action_required'
+  ) {
+    return 'in_progress'
+  }
+  if (run.status !== 'completed') return 'neutral'
+
   if (run.conclusion === 'success') return 'success'
   if (
     run.conclusion === 'failure' ||
@@ -168,6 +185,7 @@ export function runBadgeKind(
 }
 
 export function runBadgeLabel(run: Pick<WorkflowRun, 'status' | 'conclusion'>): string {
+  if (run.status === 'waiting') return 'aguardando'
   const kind = runBadgeKind(run)
   if (kind === 'in_progress') return 'em andamento'
   if (kind === 'queued') return 'na fila'

@@ -2,6 +2,7 @@ import type { PeriodFilterDays, PrNotesMap } from '../domain/filters'
 import type { ActionsStatusFilter, WorkflowRun } from '../domain/workflowRun'
 import { actionNoteKey, runBadgeKind, runBadgeLabel, runKey } from '../domain/workflowRun'
 import { hasNote } from '../storage/notes'
+import { CopyableCode } from './CopyableCode'
 
 interface ActionsListProps {
   runs: WorkflowRun[]
@@ -168,12 +169,18 @@ export function ActionsList({
                       </span>
                     </td>
                     <td className="col-repo">
-                      <code title={run.repo}>{run.repo}</code>
+                      <CopyableCode value={run.repo} title={run.repo} />
                     </td>
                     <td className="col-branches">
-                      <code className="branch" title={run.headBranch}>
-                        {run.headBranch || '—'}
-                      </code>
+                      {run.headBranch.trim() ? (
+                        <CopyableCode
+                          value={run.headBranch}
+                          className="branch"
+                          title={run.headBranch}
+                        />
+                      ) : (
+                        <span className="note-cell-empty">—</span>
+                      )}
                     </td>
                     <td className="col-event">
                       <span className="run-event">{run.event}</span>

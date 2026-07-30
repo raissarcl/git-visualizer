@@ -1,10 +1,12 @@
 /**
  * Export/import JSON dos dados do visualizador (sem PAT).
  *
- * Formato versionado (`version: 1`): notes, pins, repoLayout, sidebarCollapsed.
+ * Formato versionado (`version: 2`): notes, pins, repoLayout, sidebarCollapsed, workspaceNotes.
+ * Import de `version: 1` continua válido (workspaceNotes = []).
  */
 
 import type { PrNotesMap, PinSet } from '../domain/filters'
+import type { WorkspaceNote } from '../domain/workspaceNote'
 import { loadNotes, saveNotes } from './notes'
 import { loadPins, savePins } from './pins'
 import { SIDEBAR_COLLAPSED_KEY, saveSidebarCollapsed } from './preferences'
@@ -15,8 +17,14 @@ import {
   saveRepoLayout,
   type RepoLayout,
 } from './repoLayout'
+import {
+  loadWorkspaceNotes,
+  parseWorkspaceNotes,
+  saveWorkspaceNotes,
+} from './workspaceNotes'
 
-const BACKUP_VERSION = 1
+const BACKUP_VERSION = 2
+const SUPPORTED_IMPORT_VERSIONS = new Set([1, 2])
 
 export interface LocalBackupPayload {
   version: number
@@ -25,6 +33,7 @@ export interface LocalBackupPayload {
   pins: string[]
   repoLayout: RepoLayout
   sidebarCollapsed: boolean
+  workspaceNotes: WorkspaceNote[]
 }
 
 export interface ImportedLocalData {
@@ -32,6 +41,7 @@ export interface ImportedLocalData {
   pins: PinSet
   repoLayout: RepoLayout
   sidebarCollapsed: boolean
+  workspaceNotes: WorkspaceNote[]
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -64,6 +74,7 @@ export function buildLocalBackup(): LocalBackupPayload {
     pins: [...loadPins()],
     repoLayout: loadRepoLayout(),
     sidebarCollapsed: localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === '1',
+    workspaceNotes: loadWorkspaceNotes(),
   }
 }
 
@@ -91,8 +102,12 @@ export function parseBackupJson(text: string): ImportedLocalData {
     throw new Error('Arquivo JSON inválido.')
   }
 
-  if (!isRecord(parsed) || parsed.version !== BACKUP_VERSION) {
-    throw new Error('Backup incompatível ou sem version: 1.')
+  if (!isRecord(parsed) || typeof parsed.version !== 'number') {
+    throw new Error('Backup incompatível ou sem version.')
+  }
+
+  if (!SUPPORTED_IMPORT_VERSIONS.has(parsed.version)) {
+    throw new Error('Backup incompatível ou sem version: 1 ou 2.')
   }
 
   return {
@@ -100,6 +115,8 @@ export function parseBackupJson(text: string): ImportedLocalData {
     pins: new Set(parsePins(parsed.pins)),
     repoLayout: parseLayout(parsed.repoLayout),
     sidebarCollapsed: parsed.sidebarCollapsed === true,
+    workspaceNotes:
+      parsed.version >= 2 ? parseWorkspaceNotes(parsed.workspaceNotes) : [],
   }
 }
 
@@ -109,15 +126,17 @@ export function applyImportedData(data: ImportedLocalData): void {
   savePins(data.pins)
   saveRepoLayout(data.repoLayout)
   saveSidebarCollapsed(data.sidebarCollapsed)
+  saveWorkspaceNotes(data.workspaceNotes)
 }
 
-/** Limpa notas, pins, pastas e sidebar (nunca toca o PAT nem o tema). */
+/** Limpa notas, pins, pastas, workspace notes e sidebar (nunca toca o PAT nem o tema). */
 export function clearLocalData(): ImportedLocalData {
   const empty: ImportedLocalData = {
     notes: {},
     pins: new Set(),
     repoLayout: emptyLayout(),
     sidebarCollapsed: false,
+    workspaceNotes: [],
   }
   applyImportedData(empty)
   return empty
