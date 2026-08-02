@@ -357,6 +357,7 @@ export default function App() {
                   toggleFolderCollapsed(workspace.layout, id),
                 )
               }
+              onLayoutChange={workspace.updateLayout}
               onOrganize={() => workspace.setOrganizerOpen(true)}
               loadedCount={loadedCount}
             />

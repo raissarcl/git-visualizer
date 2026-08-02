@@ -523,6 +523,63 @@ body {
   color: var(--muted);
 }
 
+.repo-uncategorized-zone {
+  margin-top: 0.25rem;
+  border-radius: 6px;
+  min-height: 0.5rem;
+}
+
+.repo-uncategorized-zone.is-drop-target {
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  outline: 1px dashed color-mix(in srgb, var(--accent) 55%, transparent);
+  outline-offset: 1px;
+}
+
+.repo-uncategorized-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.repo-uncategorized-hint {
+  display: block;
+  padding: 0.35rem 0.55rem;
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+
+.repo-folder-header-row[draggable='true'],
+.repo-list-items li[draggable='true'],
+.org-folder-nav-row[draggable='true'],
+.org-repo-row-v2[draggable='true'] {
+  cursor: grab;
+}
+
+.repo-folder-header-row[draggable='true']:active,
+.repo-list-items li[draggable='true']:active,
+.org-folder-nav-row[draggable='true']:active,
+.org-repo-row-v2[draggable='true']:active {
+  cursor: grabbing;
+}
+
+.is-dragging {
+  opacity: 0.45;
+}
+
+.is-drop-target {
+  background: color-mix(in srgb, var(--accent) 16%, transparent) !important;
+  outline: 1px solid color-mix(in srgb, var(--accent) 50%, transparent);
+  outline-offset: -1px;
+}
+
+.is-drop-before {
+  box-shadow: inset 0 2px 0 0 var(--accent);
+}
+
+.is-drop-after {
+  box-shadow: inset 0 -2px 0 0 var(--accent);
+}
+
 .org-bulk-actions {
   display: flex;
   flex-wrap: wrap;

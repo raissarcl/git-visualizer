@@ -18,14 +18,29 @@ export interface RepoLayout {
   foldersByRepo: Record<string, string[]>
   /** repos hidden from sidebar */
   hidden: string[]
+  /** folderId → repos nesta pasta, na ordem da UI; ausente = fallback alfabético */
+  repoOrderByFolder: Record<string, string[]>
+  /** ordem dos repos sem pasta */
+  uncategorizedOrder: string[]
 }
 
 export function emptyLayout(): RepoLayout {
-  return { folders: [], foldersByRepo: {}, hidden: [] }
+  return {
+    folders: [],
+    foldersByRepo: {},
+    hidden: [],
+    repoOrderByFolder: {},
+    uncategorizedOrder: [],
+  }
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value)
+}
+
+function normalizeStringList(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return []
+  return raw.filter((item): item is string => typeof item === 'string')
 }
 
 function normalizeFolders(raw: unknown): RepoFolder[] {
@@ -74,6 +89,21 @@ function migrateFoldersByRepo(
   return {}
 }
 
+function normalizeRepoOrderByFolder(
+  raw: unknown,
+  folderIds: Set<string>,
+): Record<string, string[]> {
+  if (!isRecord(raw) || Array.isArray(raw)) return {}
+
+  const out: Record<string, string[]> = {}
+  for (const [folderId, value] of Object.entries(raw)) {
+    if (!folderIds.has(folderId)) continue
+    const list = normalizeStringList(value)
+    if (list.length > 0) out[folderId] = [...new Set(list)]
+  }
+  return out
+}
+
 /** Normaliza layout salvo/legado (folderByRepo → foldersByRepo, parentId). */
 export function normalizeLayout(raw: unknown): RepoLayout {
   if (!isRecord(raw)) return emptyLayout()
@@ -102,6 +132,13 @@ export function normalizeLayout(raw: unknown): RepoLayout {
     hidden: Array.isArray(raw.hidden)
       ? raw.hidden.filter((h): h is string => typeof h === 'string')
       : [],
+    repoOrderByFolder: normalizeRepoOrderByFolder(
+      raw.repoOrderByFolder,
+      folderIds,
+    ),
+    uncategorizedOrder: [
+      ...new Set(normalizeStringList(raw.uncategorizedOrder)),
+    ],
   }
 }
 
@@ -219,11 +256,76 @@ export function deleteFolder(layout: RepoLayout, folderId: string): RepoLayout {
     if (next.length > 0) foldersByRepo[repo] = next
   }
 
+  const repoOrderByFolder = { ...layout.repoOrderByFolder }
+  for (const id of removeIds) {
+    delete repoOrderByFolder[id]
+  }
+
   return {
     ...layout,
     folders: layout.folders.filter((f) => !removeIds.has(f.id)),
     foldersByRepo,
+    repoOrderByFolder,
   }
+}
+
+/**
+ * Move pasta para novo pai e índice entre irmãos.
+ * `index` é a posição final entre irmãos (após remoção da origem).
+ * Rejeita ciclos (novo pai na própria subárvore).
+ */
+export function moveFolder(
+  layout: RepoLayout,
+  folderId: string,
+  newParentId: string | null,
+  index: number,
+): RepoLayout {
+  const folder = layout.folders.find((f) => f.id === folderId)
+  if (!folder) return layout
+
+  if (newParentId !== null) {
+    if (!layout.folders.some((f) => f.id === newParentId)) return layout
+    if (collectSubtreeIds(layout, folderId).has(newParentId)) return layout
+  }
+
+  const siblings = layout.folders.filter(
+    (f) => f.parentId === newParentId && f.id !== folderId,
+  )
+  const clamped = Math.max(0, Math.min(Math.floor(index), siblings.length))
+
+  const without = layout.folders.filter((f) => f.id !== folderId)
+  const moved: RepoFolder = { ...folder, parentId: newParentId }
+
+  let insertAt: number
+  if (clamped === 0) {
+    const firstSiblingIdx = without.findIndex((f) => f.parentId === newParentId)
+    insertAt = firstSiblingIdx === -1 ? without.length : firstSiblingIdx
+  } else {
+    const siblingBefore = siblings[clamped - 1]
+    const idx = without.findIndex((f) => f.id === siblingBefore.id)
+    insertAt = idx + 1
+  }
+
+  return {
+    ...layout,
+    folders: [...without.slice(0, insertAt), moved, ...without.slice(insertAt)],
+  }
+}
+
+function appendToOrder(order: string[], repo: string): string[] {
+  if (order.includes(repo)) return order
+  return [...order, repo]
+}
+
+function removeFromOrder(order: string[], repo: string): string[] {
+  return order.filter((r) => r !== repo)
+}
+
+function insertAtOrder(order: string[], repo: string, index: number): string[] {
+  const next = order.filter((r) => r !== repo)
+  const clamped = Math.max(0, Math.min(Math.floor(index), next.length))
+  next.splice(clamped, 0, repo)
+  return next
 }
 
 export function addRepoToFolder(
@@ -236,9 +338,16 @@ export function addRepoToFolder(
   const current = folderIdsForRepo(layout, repo)
   if (current.includes(folderId)) return layout
 
+  const existingOrder = layout.repoOrderByFolder[folderId] ?? []
+
   return {
     ...layout,
     foldersByRepo: { ...layout.foldersByRepo, [repo]: [...current, folderId] },
+    repoOrderByFolder: {
+      ...layout.repoOrderByFolder,
+      [folderId]: appendToOrder(existingOrder, repo),
+    },
+    uncategorizedOrder: removeFromOrder(layout.uncategorizedOrder, repo),
   }
 }
 
@@ -256,7 +365,17 @@ export function removeRepoFromFolder(
   if (next.length === 0) delete foldersByRepo[repo]
   else foldersByRepo[repo] = next
 
-  return { ...layout, foldersByRepo }
+  const repoOrderByFolder = { ...layout.repoOrderByFolder }
+  const order = removeFromOrder(repoOrderByFolder[folderId] ?? [], repo)
+  if (order.length === 0) delete repoOrderByFolder[folderId]
+  else repoOrderByFolder[folderId] = order
+
+  let uncategorizedOrder = layout.uncategorizedOrder
+  if (next.length === 0) {
+    uncategorizedOrder = appendToOrder(uncategorizedOrder, repo)
+  }
+
+  return { ...layout, foldersByRepo, repoOrderByFolder, uncategorizedOrder }
 }
 
 export function addReposToFolder(
@@ -281,6 +400,92 @@ export function removeReposFromFolder(
     next = removeRepoFromFolder(next, repo, folderId)
   }
   return next
+}
+
+/** Define a ordem explícita dos repos numa pasta (`null` = sem pasta). */
+export function reorderReposInFolder(
+  layout: RepoLayout,
+  folderId: string | null,
+  orderedRepos: string[],
+): RepoLayout {
+  const unique = [...new Set(orderedRepos)]
+  if (folderId === null) {
+    return { ...layout, uncategorizedOrder: unique }
+  }
+  if (!layout.folders.some((f) => f.id === folderId)) return layout
+  return {
+    ...layout,
+    repoOrderByFolder: {
+      ...layout.repoOrderByFolder,
+      [folderId]: unique,
+    },
+  }
+}
+
+/**
+ * Move repo entre pastas (ou sem pasta).
+ * `fromFolderId`/`toFolderId` null = uncategorized.
+ * Multi-membership: remove só da origem; se destino já contém, só reordena.
+ */
+export function moveRepo(
+  layout: RepoLayout,
+  repo: string,
+  fromFolderId: string | null,
+  toFolderId: string | null,
+  index: number,
+): RepoLayout {
+  if (fromFolderId === toFolderId) {
+    if (fromFolderId === null) {
+      return reorderReposInFolder(
+        layout,
+        null,
+        insertAtOrder(layout.uncategorizedOrder, repo, index),
+      )
+    }
+    const current = layout.repoOrderByFolder[fromFolderId] ?? []
+    return reorderReposInFolder(
+      layout,
+      fromFolderId,
+      insertAtOrder(current, repo, index),
+    )
+  }
+
+  let next = layout
+
+  if (fromFolderId === null) {
+    next = {
+      ...next,
+      uncategorizedOrder: removeFromOrder(next.uncategorizedOrder, repo),
+    }
+  } else {
+    next = removeRepoFromFolder(next, repo, fromFolderId)
+    // removeRepoFromFolder may have appended to uncategorizedOrder; clear if moving elsewhere
+    if (toFolderId !== null) {
+      next = {
+        ...next,
+        uncategorizedOrder: removeFromOrder(next.uncategorizedOrder, repo),
+      }
+    }
+  }
+
+  if (toFolderId === null) {
+    // Strip all remaining memberships so the repo is truly uncategorized
+    for (const id of folderIdsForRepo(next, repo)) {
+      next = removeRepoFromFolder(next, repo, id)
+    }
+    return {
+      ...next,
+      uncategorizedOrder: insertAtOrder(next.uncategorizedOrder, repo, index),
+    }
+  }
+
+  next = addRepoToFolder(next, repo, toFolderId)
+  const order = next.repoOrderByFolder[toFolderId] ?? []
+  return reorderReposInFolder(
+    next,
+    toFolderId,
+    insertAtOrder(order, repo, index),
+  )
 }
 
 /**
@@ -349,17 +554,36 @@ function childFolders(
   return layout.folders.filter((f) => f.parentId === parentId)
 }
 
+/** Aplica ordem salva; repos sem entrada caem no fim, alfabéticos entre si. */
+export function applyRepoOrder(repos: string[], order: string[]): string[] {
+  const pending = new Set(repos)
+  const ordered: string[] = []
+
+  for (const repo of order) {
+    if (pending.has(repo)) {
+      ordered.push(repo)
+      pending.delete(repo)
+    }
+  }
+
+  const rest = [...pending].sort((a, b) =>
+    a.localeCompare(b, undefined, { sensitivity: 'base' }),
+  )
+  return [...ordered, ...rest]
+}
+
 function buildNode(
   layout: RepoLayout,
   folder: RepoFolder,
   visible: string[],
 ): FolderTreeNode {
+  const members = visible.filter((r) => isRepoInFolder(layout, r, folder.id))
   return {
     folder,
     children: childFolders(layout, folder.id).map((child) =>
       buildNode(layout, child, visible),
     ),
-    repos: visible.filter((r) => isRepoInFolder(layout, r, folder.id)),
+    repos: applyRepoOrder(members, layout.repoOrderByFolder[folder.id] ?? []),
   }
 }
 
@@ -369,12 +593,13 @@ export function buildSidebarTree(
   layout: RepoLayout,
 ): SidebarTree {
   const visible = repos.filter((r) => !isRepoHidden(layout, r))
+  const uncategorized = visible.filter((r) => isRepoUncategorized(layout, r))
 
   return {
     roots: childFolders(layout, null).map((folder) =>
       buildNode(layout, folder, visible),
     ),
-    uncategorized: visible.filter((r) => isRepoUncategorized(layout, r)),
+    uncategorized: applyRepoOrder(uncategorized, layout.uncategorizedOrder),
   }
 }
 

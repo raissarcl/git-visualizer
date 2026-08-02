@@ -1,7 +1,17 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type DragEvent } from 'react'
+import {
+  allowDrop,
+  dropPositionFromEvent,
+  getDndPayload,
+  repoInsertIndex,
+  setDndPayload,
+  siblingInsertIndex,
+  type DndPayload,
+} from './dnd'
 import {
   addReposToFolder,
   addRepoToFolder,
+  applyRepoOrder,
   cloneLayout,
   createFolder,
   deleteFolder,
@@ -9,9 +19,12 @@ import {
   isRepoInFolder,
   isRepoUncategorized,
   layoutsEqual,
+  moveFolder,
+  moveRepo,
   removeReposFromFolder,
   removeRepoFromFolder,
   renameFolder,
+  reorderReposInFolder,
   setRepoHidden,
   type RepoFolder,
   type RepoLayout,
@@ -27,6 +40,23 @@ interface RepoOrganizerProps {
   onClose: () => void
 }
 
+type DropHint =
+  | { kind: 'folder'; id: string; mode: 'before' | 'after' | 'into' }
+  | { kind: 'repo'; name: string; mode: 'before' | 'after' }
+  | null
+
+function folderDropMode(
+  event: { clientY: number },
+  element: HTMLElement,
+): 'before' | 'after' | 'into' {
+  const rect = element.getBoundingClientRect()
+  const y = event.clientY - rect.top
+  const h = rect.height || 1
+  if (y < h / 3) return 'before'
+  if (y > (2 * h) / 3) return 'after'
+  return 'into'
+}
+
 function FolderNavItem({
   folder,
   depth,
@@ -34,11 +64,16 @@ function FolderNavItem({
   renamingId,
   renameValue,
   draft,
+  siblingIds,
+  dragPayload,
+  dropHint,
   setActive,
   setRenamingId,
   setRenameValue,
   setDraft,
   commitRename,
+  setDragPayload,
+  setDropHint,
 }: {
   folder: RepoFolder
   depth: number
@@ -46,16 +81,28 @@ function FolderNavItem({
   renamingId: string | null
   renameValue: string
   draft: RepoLayout
+  siblingIds: string[]
+  dragPayload: DndPayload | null
+  dropHint: DropHint
   setActive: (id: ActiveTarget) => void
   setRenamingId: (id: string | null) => void
   setRenameValue: (value: string) => void
   setDraft: (layout: RepoLayout) => void
   commitRename: () => void
+  setDragPayload: (p: DndPayload | null) => void
+  setDropHint: (h: DropHint) => void
 }) {
   const children = draft.folders.filter((f) => f.parentId === folder.id)
+  const childIds = children.map((c) => c.id)
+  const isDragging =
+    dragPayload?.kind === 'folder' && dragPayload.id === folder.id
+  const hintHere =
+    dropHint?.kind === 'folder' && dropHint.id === folder.id
+      ? dropHint.mode
+      : null
 
   return (
-    <li>
+    <li className={isDragging ? 'is-dragging' : undefined}>
       {renamingId === folder.id ? (
         <div
           className="org-folder-rename"
@@ -77,8 +124,85 @@ function FolderNavItem({
         </div>
       ) : (
         <div
-          className={`org-folder-nav-row${active === folder.id ? ' is-active' : ''}`}
+          className={`org-folder-nav-row${active === folder.id ? ' is-active' : ''}${
+            hintHere === 'before'
+              ? ' is-drop-before'
+              : hintHere === 'after'
+                ? ' is-drop-after'
+                : hintHere === 'into'
+                  ? ' is-drop-target'
+                  : ''
+          }`}
           style={{ paddingLeft: `${depth * 12}px` }}
+          draggable
+          onDragStart={(e) => {
+            const payload: DndPayload = { kind: 'folder', id: folder.id }
+            setDndPayload(e.dataTransfer, payload)
+            setDragPayload(payload)
+          }}
+          onDragEnd={() => {
+            setDragPayload(null)
+            setDropHint(null)
+          }}
+          onDragOver={(e) => {
+            if (!dragPayload) return
+            allowDrop(e)
+            e.stopPropagation()
+            if (dragPayload.kind === 'folder') {
+              if (dragPayload.id === folder.id) {
+                setDropHint(null)
+                return
+              }
+              setDropHint({
+                kind: 'folder',
+                id: folder.id,
+                mode: folderDropMode(e, e.currentTarget as HTMLElement),
+              })
+            } else {
+              setDropHint({ kind: 'folder', id: folder.id, mode: 'into' })
+            }
+          }}
+          onDrop={(e) => {
+            e.preventDefault()
+            e.stopPropagation()
+            const payload = getDndPayload(e.dataTransfer) ?? dragPayload
+            setDropHint(null)
+            setDragPayload(null)
+            if (!payload) return
+
+            if (payload.kind === 'folder') {
+              if (payload.id === folder.id) return
+              const mode = folderDropMode(e, e.currentTarget as HTMLElement)
+              if (mode === 'into') {
+                const kids = draft.folders.filter(
+                  (f) => f.parentId === folder.id,
+                )
+                setDraft(moveFolder(draft, payload.id, folder.id, kids.length))
+                return
+              }
+              const index = siblingInsertIndex(
+                siblingIds,
+                payload.id,
+                folder.id,
+                mode,
+              )
+              setDraft(moveFolder(draft, payload.id, folder.parentId, index))
+              return
+            }
+
+            // Move repo into this folder (from organizer list or cross-folder)
+            const order = draft.repoOrderByFolder[folder.id] ?? []
+            setDraft(
+              moveRepo(
+                draft,
+                payload.name,
+                payload.fromFolderId,
+                folder.id,
+                order.length,
+              ),
+            )
+            setActive(folder.id)
+          }}
         >
           <button
             type="button"
@@ -128,11 +252,16 @@ function FolderNavItem({
               renamingId={renamingId}
               renameValue={renameValue}
               draft={draft}
+              siblingIds={childIds}
+              dragPayload={dragPayload}
+              dropHint={dropHint}
               setActive={setActive}
               setRenamingId={setRenamingId}
               setRenameValue={setRenameValue}
               setDraft={setDraft}
               commitRename={commitRename}
+              setDragPayload={setDragPayload}
+              setDropHint={setDropHint}
             />
           ))}
         </ul>
@@ -154,6 +283,8 @@ export function RepoOrganizer({
   const [renameValue, setRenameValue] = useState('')
   const [filter, setFilter] = useState('')
   const [active, setActive] = useState<ActiveTarget>('uncategorized')
+  const [dragPayload, setDragPayload] = useState<DndPayload | null>(null)
+  const [dropHint, setDropHint] = useState<DropHint>(null)
   const wasOpen = useRef(false)
 
   useEffect(() => {
@@ -164,6 +295,8 @@ export function RepoOrganizer({
       setRenameValue('')
       setFilter('')
       setActive('uncategorized')
+      setDragPayload(null)
+      setDropHint(null)
     }
 
     wasOpen.current = open
@@ -190,10 +323,35 @@ export function RepoOrganizer({
     return base.filter((r) => r.toLowerCase().includes(q))
   }, [repos, filter, active, draft])
 
+  const orderedActiveRepos = useMemo(() => {
+    if (active === 'uncategorized') {
+      return applyRepoOrder(
+        filteredRepos.filter((r) => isRepoUncategorized(draft, r)),
+        draft.uncategorizedOrder,
+      )
+    }
+    const inFolder = filteredRepos.filter((r) =>
+      isRepoInFolder(draft, r, active),
+    )
+    return applyRepoOrder(inFolder, draft.repoOrderByFolder[active] ?? [])
+  }, [active, draft, filteredRepos])
+
+  const displayRepos = useMemo(() => {
+    if (active === 'uncategorized') return orderedActiveRepos
+    // When viewing a folder, show all filtered repos (for checkboxes) but
+    // members first in custom order, then the rest alphabetically.
+    const memberSet = new Set(orderedActiveRepos)
+    const rest = filteredRepos
+      .filter((r) => !memberSet.has(r))
+      .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }))
+    return [...orderedActiveRepos, ...rest]
+  }, [active, orderedActiveRepos, filteredRepos])
+
   const rootFolders = useMemo(
     () => draft.folders.filter((f) => f.parentId === null),
     [draft.folders],
   )
+  const rootIds = rootFolders.map((f) => f.id)
 
   const dirty = !layoutsEqual(draft, layout)
 
@@ -265,11 +423,69 @@ export function RepoOrganizer({
     active === 'uncategorized' ? 'Sem pasta' : (activeFolder?.name ?? 'Pasta')
 
   const canBulk = active !== 'uncategorized'
+  const canReorderRepos =
+    filter.trim() === '' &&
+    (active === 'uncategorized' ||
+      displayRepos.some((r) => isRepoInFolder(draft, r, active as string)))
 
   const createPlaceholder =
     active === 'uncategorized'
       ? 'Nova pasta na raiz…'
       : `Subpasta em ${activeFolder?.name ?? 'pasta'}…`
+
+  const handleRepoDragStart = (e: DragEvent, repo: string) => {
+    if (!isInActiveFolder(repo) && active !== 'uncategorized') return
+    const payload: DndPayload = {
+      kind: 'repo',
+      name: repo,
+      fromFolderId: active === 'uncategorized' ? null : active,
+    }
+    setDndPayload(e.dataTransfer, payload)
+    setDragPayload(payload)
+  }
+
+  const handleRepoDropOnRepo = (e: DragEvent, targetRepo: string) => {
+    e.preventDefault()
+    e.stopPropagation()
+    const payload = getDndPayload(e.dataTransfer) ?? dragPayload
+    setDropHint(null)
+    setDragPayload(null)
+    if (!payload || payload.kind !== 'repo') return
+    if (!canReorderRepos) return
+    if (
+      active !== 'uncategorized' &&
+      !isRepoInFolder(draft, targetRepo, active)
+    ) {
+      return
+    }
+
+    const mode = dropPositionFromEvent(e, e.currentTarget as HTMLElement)
+    const ordered =
+      active === 'uncategorized'
+        ? applyRepoOrder(
+            repos.filter((r) => isRepoUncategorized(draft, r)),
+            draft.uncategorizedOrder,
+          )
+        : applyRepoOrder(
+            repos.filter((r) => isRepoInFolder(draft, r, active)),
+            draft.repoOrderByFolder[active] ?? [],
+          )
+
+    const index = repoInsertIndex(ordered, payload.name, targetRepo, mode)
+    const folderId = active === 'uncategorized' ? null : active
+
+    if (payload.fromFolderId === folderId) {
+      const without = ordered.filter((r) => r !== payload.name)
+      const insertAt = Math.max(0, Math.min(index, without.length))
+      without.splice(insertAt, 0, payload.name)
+      setDraft(reorderReposInFolder(draft, folderId, without))
+      return
+    }
+
+    setDraft(
+      moveRepo(draft, payload.name, payload.fromFolderId, folderId, index),
+    )
+  }
 
   return (
     <div className="org-overlay" role="presentation" onClick={requestClose}>
@@ -322,6 +538,27 @@ export function RepoOrganizer({
                   type="button"
                   className={`org-folder-nav-item${active === 'uncategorized' ? ' is-active' : ''}`}
                   onClick={() => setActive('uncategorized')}
+                  onDragOver={(e) => {
+                    if (dragPayload?.kind !== 'repo') return
+                    allowDrop(e)
+                  }}
+                  onDrop={(e) => {
+                    e.preventDefault()
+                    const payload = getDndPayload(e.dataTransfer) ?? dragPayload
+                    setDragPayload(null)
+                    setDropHint(null)
+                    if (!payload || payload.kind !== 'repo') return
+                    setDraft(
+                      moveRepo(
+                        draft,
+                        payload.name,
+                        payload.fromFolderId,
+                        null,
+                        draft.uncategorizedOrder.length,
+                      ),
+                    )
+                    setActive('uncategorized')
+                  }}
                 >
                   Sem pasta
                 </button>
@@ -335,11 +572,16 @@ export function RepoOrganizer({
                   renamingId={renamingId}
                   renameValue={renameValue}
                   draft={draft}
+                  siblingIds={rootIds}
+                  dragPayload={dragPayload}
+                  dropHint={dropHint}
                   setActive={setActive}
                   setRenamingId={setRenamingId}
                   setRenameValue={setRenameValue}
                   setDraft={setDraft}
                   commitRename={commitRename}
+                  setDragPayload={setDragPayload}
+                  setDropHint={setDropHint}
                 />
               ))}
             </ul>
@@ -376,18 +618,62 @@ export function RepoOrganizer({
             )}
             <p className="org-hint">
               {active === 'uncategorized'
-                ? 'Repos sem nenhuma pasta. Selecione uma pasta à esquerda e marque repos para adicioná-los (um repo pode estar em várias pastas).'
-                : 'Marque repos nesta pasta (ou use Selecionar todos). Visível controla a sidebar. Desmarcar remove só desta pasta.'}
+                ? 'Repos sem nenhuma pasta. Arraste para reordenar ou solte numa pasta à esquerda. Um repo pode estar em várias pastas.'
+                : 'Marque repos nesta pasta. Arraste membros para reordenar; solte numa pasta à esquerda para mover. Visível controla a sidebar.'}
             </p>
             <ul className="org-repo-list scrollable">
-              {filteredRepos.length === 0 ? (
+              {displayRepos.length === 0 ? (
                 <li className="org-empty">Nenhum repo encontrado.</li>
               ) : (
-                filteredRepos.map((repo) => {
+                displayRepos.map((repo) => {
                   const inFolder = isInActiveFolder(repo)
                   const visible = !isRepoHidden(draft, repo)
+                  const memberDraggable =
+                    canReorderRepos && (active === 'uncategorized' || inFolder)
+                  const repoHint =
+                    dropHint?.kind === 'repo' && dropHint.name === repo
+                      ? dropHint.mode
+                      : null
+                  const repoDragging =
+                    dragPayload?.kind === 'repo' && dragPayload.name === repo
+
                   return (
-                    <li key={repo} className="org-repo-row-v2">
+                    <li
+                      key={repo}
+                      className={`org-repo-row-v2${repoDragging ? ' is-dragging' : ''}${
+                        repoHint === 'before'
+                          ? ' is-drop-before'
+                          : repoHint === 'after'
+                            ? ' is-drop-after'
+                            : ''
+                      }`}
+                      draggable={memberDraggable}
+                      onDragStart={(e) => {
+                        if (!memberDraggable) {
+                          e.preventDefault()
+                          return
+                        }
+                        handleRepoDragStart(e, repo)
+                      }}
+                      onDragEnd={() => {
+                        setDragPayload(null)
+                        setDropHint(null)
+                      }}
+                      onDragOver={(e) => {
+                        if (!dragPayload || dragPayload.kind !== 'repo') return
+                        if (!memberDraggable || !inFolder) return
+                        allowDrop(e)
+                        setDropHint({
+                          kind: 'repo',
+                          name: repo,
+                          mode: dropPositionFromEvent(
+                            e,
+                            e.currentTarget as HTMLElement,
+                          ),
+                        })
+                      }}
+                      onDrop={(e) => handleRepoDropOnRepo(e, repo)}
+                    >
                       <label className="org-folder-check">
                         <input
                           type="checkbox"
