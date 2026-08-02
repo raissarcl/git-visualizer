@@ -66,7 +66,8 @@ export function SearchableSelect({
     const q = query.trim().toLowerCase()
     if (!q) return options
     return options.filter(
-      (o) => o.label.toLowerCase().includes(q) || o.value.toLowerCase().includes(q),
+      (o) =>
+        o.label.toLowerCase().includes(q) || o.value.toLowerCase().includes(q),
     )
   }, [options, query])
 
@@ -86,8 +87,12 @@ export function SearchableSelect({
     const rect = el.getBoundingClientRect()
     const spaceBelow = window.innerHeight - rect.bottom - 8
     const spaceAbove = rect.top - 8
-    const openUp = spaceBelow < Math.min(LIST_MAX_HEIGHT, 160) && spaceAbove > spaceBelow
-    const maxHeight = Math.max(120, Math.min(LIST_MAX_HEIGHT, openUp ? spaceAbove : spaceBelow))
+    const openUp =
+      spaceBelow < Math.min(LIST_MAX_HEIGHT, 160) && spaceAbove > spaceBelow
+    const maxHeight = Math.max(
+      120,
+      Math.min(LIST_MAX_HEIGHT, openUp ? spaceAbove : spaceBelow),
+    )
 
     setMenuStyle({
       position: 'fixed',
@@ -115,7 +120,9 @@ export function SearchableSelect({
 
   useEffect(() => {
     if (!open || !listRef.current) return
-    const active = listRef.current.querySelector<HTMLElement>('.search-select-option.is-active')
+    const active = listRef.current.querySelector<HTMLElement>(
+      '.search-select-option.is-active',
+    )
     active?.scrollIntoView({ block: 'nearest' })
   }, [highlight, open])
 
@@ -170,7 +177,8 @@ export function SearchableSelect({
     if (e.key === 'ArrowDown') {
       e.preventDefault()
       if (!open) openList()
-      else setHighlight((h) => Math.min(h + 1, Math.max(filtered.length - 1, 0)))
+      else
+        setHighlight((h) => Math.min(h + 1, Math.max(filtered.length - 1, 0)))
       return
     }
     if (e.key === 'ArrowUp') {

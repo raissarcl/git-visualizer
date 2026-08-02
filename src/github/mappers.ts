@@ -1,4 +1,9 @@
-import type { MergeableState, PageInfo, PrState, PullRequest } from '../domain/pullRequest'
+import type {
+  MergeableState,
+  PageInfo,
+  PrState,
+  PullRequest,
+} from '../domain/pullRequest'
 
 /** Nó GraphQL de PR retornado pela search. */
 export interface SearchPullRequestNode {
@@ -43,7 +48,11 @@ export interface ViewerReposResponse {
 
 /** Converte nó GraphQL no modelo de domínio. */
 export function mapPr(node: SearchPullRequestNode): PullRequest {
-  const state: PrState = node.merged ? 'MERGED' : node.state === 'OPEN' ? 'OPEN' : 'CLOSED'
+  const state: PrState = node.merged
+    ? 'MERGED'
+    : node.state === 'OPEN'
+      ? 'OPEN'
+      : 'CLOSED'
 
   return {
     id: node.id,

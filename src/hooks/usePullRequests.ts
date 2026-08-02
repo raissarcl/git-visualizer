@@ -26,9 +26,16 @@ export function usePullRequests(options: {
 
   const [viewerRepos, setViewerRepos] = useState<string[]>([])
   const [prs, setPrs] = useState<PullRequest[]>([])
-  const [pageInfo, setPageInfo] = useState<PageInfo>({ hasNextPage: false, endCursor: null })
-  const [folderCursors, setFolderCursors] = useState<Record<string, string | null>>({})
-  const [folderHasMore, setFolderHasMore] = useState<Record<string, boolean>>({})
+  const [pageInfo, setPageInfo] = useState<PageInfo>({
+    hasNextPage: false,
+    endCursor: null,
+  })
+  const [folderCursors, setFolderCursors] = useState<
+    Record<string, string | null>
+  >({})
+  const [folderHasMore, setFolderHasMore] = useState<Record<string, boolean>>(
+    {},
+  )
 
   const [loading, setLoading] = useState(false)
   const [loadingMore, setLoadingMore] = useState(false)
@@ -77,7 +84,11 @@ export function usePullRequests(options: {
 
       try {
         if (opts.scope.type === 'folder') {
-          const folderRepos = reposInFolder(opts.layout, opts.scope.id, opts.allRepos)
+          const folderRepos = reposInFolder(
+            opts.layout,
+            opts.scope.id,
+            opts.allRepos,
+          )
 
           if (folderRepos.length === 0) {
             setPrs([])
@@ -188,7 +199,16 @@ export function usePullRequests(options: {
       allRepos: viewerRepos,
       append: false,
     })
-  }, [token, loadRepos, loadPrs, mineOnly, scope, stateFilter, layout, viewerRepos])
+  }, [
+    token,
+    loadRepos,
+    loadPrs,
+    mineOnly,
+    scope,
+    stateFilter,
+    layout,
+    viewerRepos,
+  ])
 
   const resetOnEmptyToken = useCallback(() => {
     setPrs([])

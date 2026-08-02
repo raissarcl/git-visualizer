@@ -1,8 +1,7 @@
 import type { PinSet, PrNotesMap } from '../domain/filters'
 import { prKey } from '../domain/prKey'
 import type { PullRequest } from '../domain/pullRequest'
-import { hasNote } from '../storage/notes'
-import { isPinned } from '../storage/pins'
+import { hasNote, isPinned } from '../domain/filters'
 import { CopyableCode } from './CopyableCode'
 
 interface PrListProps {
@@ -39,7 +38,10 @@ export function PrList({
   const showEmpty = !loading && prs.length === 0
 
   return (
-    <div className={`pr-list-wrap scrollable${loading ? ' is-loading' : ''}`} aria-busy={loading}>
+    <div
+      className={`pr-list-wrap scrollable${loading ? ' is-loading' : ''}`}
+      aria-busy={loading}
+    >
       <table className="pr-list">
         <thead>
           <tr>
@@ -81,7 +83,11 @@ export function PrList({
                   <td className="col-title">
                     <span className="pr-title-row">
                       {pinned && (
-                        <span className="pin-mark" title="Fixado" aria-label="Fixado">
+                        <span
+                          className="pin-mark"
+                          title="Fixado"
+                          aria-label="Fixado"
+                        >
                           ♥
                         </span>
                       )}
@@ -117,8 +123,12 @@ export function PrList({
                     />
                   </td>
                   <td className="col-state">
-                    <span className={`badge badge-${pr.state.toLowerCase()}`}>{pr.state}</span>
-                    {conflicting && <span className="badge badge-conflict">conflito</span>}
+                    <span className={`badge badge-${pr.state.toLowerCase()}`}>
+                      {pr.state}
+                    </span>
+                    {conflicting && (
+                      <span className="badge badge-conflict">conflito</span>
+                    )}
                   </td>
                   <td className="col-date">{formatShortDate(pr.updatedAt)}</td>
                 </tr>

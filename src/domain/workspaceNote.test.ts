@@ -10,7 +10,9 @@ import {
   type WorkspaceNote,
 } from './workspaceNote'
 
-function note(partial: Partial<WorkspaceNote> & Pick<WorkspaceNote, 'id'>): WorkspaceNote {
+function note(
+  partial: Partial<WorkspaceNote> & Pick<WorkspaceNote, 'id'>,
+): WorkspaceNote {
   return createWorkspaceNote(partial)
 }
 
@@ -147,7 +149,10 @@ describe('findMatchingPr', () => {
 
 describe('normalizeTags', () => {
   it('trims and dedupes case-insensitively', () => {
-    expect(normalizeTags(['  WIP ', 'wip', 'deploy', ''])).toEqual(['WIP', 'deploy'])
+    expect(normalizeTags(['  WIP ', 'wip', 'deploy', ''])).toEqual([
+      'WIP',
+      'deploy',
+    ])
   })
 })
 

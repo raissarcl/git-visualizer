@@ -9,7 +9,13 @@ import type {
   WorkflowInput,
 } from '../domain/workflowRun'
 import { sortRunsByCreatedDesc } from '../domain/workflowRun'
-import { mapPool, parseLinkNext, restGet, restGetWithLink, restPost } from './rest'
+import {
+  mapPool,
+  parseLinkNext,
+  restGet,
+  restGetWithLink,
+  restPost,
+} from './rest'
 import { parseWorkflowDispatchDetailed } from './workflowYaml'
 
 const RUNS_PER_PAGE = 20
@@ -88,13 +94,12 @@ interface RestRepo {
 
 function splitRepo(fullName: string): { owner: string; repo: string } {
   const [owner, repo] = fullName.split('/')
-  if (!owner || !repo) throw new Error(`Nome de repositório inválido: ${fullName}`)
+  if (!owner || !repo)
+    throw new Error(`Nome de repositório inválido: ${fullName}`)
   return { owner, repo }
 }
 
-function mapRunInputs(
-  raw: RestWorkflowRun['inputs'],
-): Record<string, string> {
+function mapRunInputs(raw: RestWorkflowRun['inputs']): Record<string, string> {
   if (!raw || typeof raw !== 'object') return {}
   const out: Record<string, string> = {}
   for (const [key, value] of Object.entries(raw)) {
@@ -108,7 +113,8 @@ function mapRun(raw: RestWorkflowRun, repo: string): WorkflowRun {
     id: raw.id,
     databaseId: String(raw.id),
     name: raw.name?.trim() || 'Workflow',
-    displayTitle: raw.display_title?.trim() || raw.name?.trim() || `Run #${raw.run_number}`,
+    displayTitle:
+      raw.display_title?.trim() || raw.name?.trim() || `Run #${raw.run_number}`,
     status: raw.status as WorkflowRun['status'],
     conclusion: raw.conclusion as WorkflowRun['conclusion'],
     htmlUrl: raw.html_url,
@@ -158,7 +164,9 @@ export async function fetchRepoWorkflowRuns(
     token,
     `/repos/${owner}/${repo}/actions/runs?per_page=${perPage}`,
   )
-  return sortRunsByCreatedDesc((data.workflow_runs ?? []).map((r) => mapRun(r, repoFullName)))
+  return sortRunsByCreatedDesc(
+    (data.workflow_runs ?? []).map((r) => mapRun(r, repoFullName)),
+  )
 }
 
 export interface FolderRunsResult {
@@ -176,7 +184,10 @@ export async function fetchFolderWorkflowRuns(
 ): Promise<FolderRunsResult> {
   const batches = await mapPool(repos, FOLDER_CONCURRENCY, async (name) => {
     try {
-      return { ok: true as const, runs: await fetchRepoWorkflowRuns(token, name, perPage) }
+      return {
+        ok: true as const,
+        runs: await fetchRepoWorkflowRuns(token, name, perPage),
+      }
     } catch (err) {
       return {
         ok: false as const,
@@ -194,7 +205,9 @@ export async function fetchFolderWorkflowRuns(
   return {
     runs,
     errors,
-    fatalError: allFailed ? (errors[0] ?? 'Falha ao buscar Actions da pasta.') : null,
+    fatalError: allFailed
+      ? (errors[0] ?? 'Falha ao buscar Actions da pasta.')
+      : null,
   }
 }
 
@@ -249,7 +262,10 @@ export async function rerunFailedJobs(
   runId: number,
 ): Promise<void> {
   const { owner, repo } = splitRepo(repoFullName)
-  await restPost(token, `/repos/${owner}/${repo}/actions/runs/${runId}/rerun-failed-jobs`)
+  await restPost(
+    token,
+    `/repos/${owner}/${repo}/actions/runs/${runId}/rerun-failed-jobs`,
+  )
 }
 
 export async function fetchRepoWorkflows(
@@ -328,7 +344,9 @@ export async function fetchWorkflowDispatchInputs(
   )
 
   if (file.type && file.type !== 'file') {
-    throw new Error(`O path “${workflowPath}” não é um arquivo (type=${file.type}).`)
+    throw new Error(
+      `O path “${workflowPath}” não é um arquivo (type=${file.type}).`,
+    )
   }
 
   let yamlText = ''
@@ -336,19 +354,30 @@ export async function fetchWorkflowDispatchInputs(
     yamlText = decodeBase64Utf8(file.content)
   } else if (file.download_url) {
     const raw = await fetch(file.download_url, {
-      headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github.raw' },
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: 'application/vnd.github.raw',
+      },
     })
     if (!raw.ok) {
-      throw new Error(`Falha ao baixar YAML (${raw.status}) em ${workflowPath}@${refLabel}.`)
+      throw new Error(
+        `Falha ao baixar YAML (${raw.status}) em ${workflowPath}@${refLabel}.`,
+      )
     }
     yamlText = await raw.text()
   } else {
-    throw new Error(`Não foi possível ler o arquivo do workflow (${workflowPath}).`)
+    throw new Error(
+      `Não foi possível ler o arquivo do workflow (${workflowPath}).`,
+    )
   }
 
   const parsed = parseWorkflowDispatchDetailed(yamlText)
 
-  if (parsed.parseError && parsed.inputs === null && !parsed.rawMentionsDispatch) {
+  if (
+    parsed.parseError &&
+    parsed.inputs === null &&
+    !parsed.rawMentionsDispatch
+  ) {
     throw new Error(
       `YAML inválido em ${workflowPath}@${refLabel}: ${parsed.parseError}`,
     )
@@ -356,7 +385,9 @@ export async function fetchWorkflowDispatchInputs(
 
   if (parsed.inputs === null) {
     const keys =
-      parsed.onKeys.length > 0 ? parsed.onKeys.join(', ') : '(nenhum gatilho em on:)'
+      parsed.onKeys.length > 0
+        ? parsed.onKeys.join(', ')
+        : '(nenhum gatilho em on:)'
     const hint = parsed.rawMentionsDispatch
       ? ' O texto menciona workflow_dispatch, mas não ficou sob on: — confira indentação/YAML.'
       : ' Nesse arquivo/ref não há workflow_dispatch em on:.'
@@ -378,5 +409,9 @@ export async function dispatchWorkflow(
   const { owner, repo } = splitRepo(repoFullName)
   const body: { ref: string; inputs?: Record<string, string> } = { ref }
   if (Object.keys(inputs).length > 0) body.inputs = inputs
-  await restPost(token, `/repos/${owner}/${repo}/actions/workflows/${workflowId}/dispatches`, body)
+  await restPost(
+    token,
+    `/repos/${owner}/${repo}/actions/workflows/${workflowId}/dispatches`,
+    body,
+  )
 }

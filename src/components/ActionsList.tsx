@@ -1,7 +1,12 @@
 import type { PeriodFilterDays, PrNotesMap } from '../domain/filters'
 import type { ActionsStatusFilter, WorkflowRun } from '../domain/workflowRun'
-import { actionNoteKey, runBadgeKind, runBadgeLabel, runKey } from '../domain/workflowRun'
-import { hasNote } from '../storage/notes'
+import {
+  actionNoteKey,
+  runBadgeKind,
+  runBadgeLabel,
+  runKey,
+} from '../domain/workflowRun'
+import { hasNote } from '../domain/filters'
 import { CopyableCode } from './CopyableCode'
 
 interface ActionsListProps {
@@ -69,7 +74,9 @@ export function ActionsList({
           <span className="sr-only">Status</span>
           <select
             value={statusFilter}
-            onChange={(e) => onStatusFilterChange(e.target.value as ActionsStatusFilter)}
+            onChange={(e) =>
+              onStatusFilterChange(e.target.value as ActionsStatusFilter)
+            }
             disabled={loading}
           >
             <option value="all">Todos</option>
@@ -82,7 +89,9 @@ export function ActionsList({
           <span className="sr-only">Período</span>
           <select
             value={String(withinDays)}
-            onChange={(e) => onWithinDaysChange(Number(e.target.value) as PeriodFilterDays)}
+            onChange={(e) =>
+              onWithinDaysChange(Number(e.target.value) as PeriodFilterDays)
+            }
             disabled={loading}
           >
             <option value="0">Todos</option>
@@ -112,7 +121,10 @@ export function ActionsList({
         )}
       </div>
 
-      <div className={`pr-list-wrap scrollable${loading ? ' is-loading' : ''}`} aria-busy={loading}>
+      <div
+        className={`pr-list-wrap scrollable${loading ? ' is-loading' : ''}`}
+        aria-busy={loading}
+      >
         <table className="pr-list actions-list">
           <thead>
             <tr>
@@ -128,12 +140,16 @@ export function ActionsList({
             {loading ? (
               <tr className="list-loading-row">
                 <td colSpan={6}>
-                  <span className="list-loading-label">Carregando Actions…</span>
+                  <span className="list-loading-label">
+                    Carregando Actions…
+                  </span>
                 </td>
               </tr>
             ) : showEmpty ? (
               <tr className="list-empty-row">
-                <td colSpan={6}>Nenhum run para mostrar com os filtros atuais.</td>
+                <td colSpan={6}>
+                  Nenhum run para mostrar com os filtros atuais.
+                </td>
               </tr>
             ) : (
               runs.map((run) => {
@@ -149,7 +165,9 @@ export function ActionsList({
                     onClick={() => onSelect(run)}
                   >
                     <td className="col-state">
-                      <span className={`badge badge-run-${kind}`}>{runBadgeLabel(run)}</span>
+                      <span className={`badge badge-run-${kind}`}>
+                        {runBadgeLabel(run)}
+                      </span>
                     </td>
                     <td className="col-title">
                       <span className="pr-title-row">
@@ -185,7 +203,9 @@ export function ActionsList({
                     <td className="col-event">
                       <span className="run-event">{run.event}</span>
                     </td>
-                    <td className="col-date">{formatShortDate(run.createdAt)}</td>
+                    <td className="col-date">
+                      {formatShortDate(run.createdAt)}
+                    </td>
                   </tr>
                 )
               })

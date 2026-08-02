@@ -13,7 +13,11 @@ function authHeaders(token: string, extra?: HeadersInit): Headers {
   return headers
 }
 
-function statusMessage(status: number, statusText: string, bodyText: string): string {
+function statusMessage(
+  status: number,
+  statusText: string,
+  bodyText: string,
+): string {
   if (status === 401) {
     return 'Token inválido ou expirado. Gere um novo PAT no GitHub.'
   }
@@ -47,7 +51,10 @@ async function parseError(res: Response): Promise<never> {
  * GET JSON autenticado.
  * @returns `null` em 404; lança em outros erros.
  */
-export async function restGetOrNull<T>(token: string, path: string): Promise<T | null> {
+export async function restGetOrNull<T>(
+  token: string,
+  path: string,
+): Promise<T | null> {
   const res = await fetch(`${GITHUB_API}${path}`, {
     method: 'GET',
     headers: authHeaders(token),
@@ -80,7 +87,9 @@ export async function restGetWithLink<T>(
   token: string,
   pathOrUrl: string,
 ): Promise<{ data: T; link: string | null }> {
-  const url = pathOrUrl.startsWith('http') ? pathOrUrl : `${GITHUB_API}${pathOrUrl}`
+  const url = pathOrUrl.startsWith('http')
+    ? pathOrUrl
+    : `${GITHUB_API}${pathOrUrl}`
   const res = await fetch(url, {
     method: 'GET',
     headers: authHeaders(token),
@@ -148,7 +157,9 @@ export async function mapPool<T, R>(
     }
   }
 
-  const workers = Array.from({ length: Math.min(limit, items.length) }, () => worker())
+  const workers = Array.from({ length: Math.min(limit, items.length) }, () =>
+    worker(),
+  )
   await Promise.all(workers)
   return results
 }

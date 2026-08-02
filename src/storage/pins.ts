@@ -14,7 +14,9 @@ export function loadPins(): PinSet {
     if (!raw) return new Set()
     const parsed = JSON.parse(raw) as unknown
     if (!Array.isArray(parsed)) return new Set()
-    return new Set(parsed.filter((k): k is string => typeof k === 'string' && k.length > 0))
+    return new Set(
+      parsed.filter((k): k is string => typeof k === 'string' && k.length > 0),
+    )
   } catch {
     return new Set()
   }
@@ -24,9 +26,7 @@ export function savePins(pins: PinSet): void {
   localStorage.setItem(PINS_KEY, JSON.stringify([...pins]))
 }
 
-export function isPinned(pins: PinSet, key: string): boolean {
-  return pins.has(key)
-}
+export { isPinned } from '../domain/filters'
 
 export function togglePin(pins: PinSet, key: string): PinSet {
   const next = new Set(pins)

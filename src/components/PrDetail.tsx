@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { prKey } from '../domain/prKey'
 import type { PullRequest } from '../domain/pullRequest'
-import { hasNote } from '../storage/notes'
+import { hasNote } from '../domain/filters'
 import { copyText } from '../lib/clipboard'
 import { useCopiedFeedback } from '../hooks/useCopiedFeedback'
 import { CopiedTooltip } from './CopiedTooltip'
@@ -101,7 +101,12 @@ export function PrDetail({
         >
           {pinned ? 'Fixado' : 'Fixar'}
         </button>
-        <button type="button" className="detail-close" onClick={onClose} aria-label="Fechar">
+        <button
+          type="button"
+          className="detail-close"
+          onClick={onClose}
+          aria-label="Fechar"
+        >
           ×
         </button>
       </div>
@@ -128,8 +133,12 @@ export function PrDetail({
         <div>
           <dt>Estado</dt>
           <dd>
-            <span className={`badge badge-${pr.state.toLowerCase()}`}>{pr.state}</span>
-            {conflicting && <span className="badge badge-conflict">conflito</span>}
+            <span className={`badge badge-${pr.state.toLowerCase()}`}>
+              {pr.state}
+            </span>
+            {conflicting && (
+              <span className="badge badge-conflict">conflito</span>
+            )}
           </dd>
         </div>
         <div>
@@ -168,9 +177,17 @@ export function PrDetail({
       <div className="detail-notes">
         <div className="detail-notes-heading">
           <h3>Notas</h3>
-          {noteFilled && <span className="note-badge" title="Tem nota local">nota</span>}
+          {noteFilled && (
+            <span className="note-badge" title="Tem nota local">
+              nota
+            </span>
+          )}
           <CopyMarkdownButton value={draft} title="Copiar nota em markdown" />
-          <div className="notes-mode-tabs" role="tablist" aria-label="Modo das notas">
+          <div
+            className="notes-mode-tabs"
+            role="tablist"
+            aria-label="Modo das notas"
+          >
             <button
               type="button"
               role="tab"

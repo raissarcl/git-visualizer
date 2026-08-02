@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { ActionDetail } from './components/ActionDetail'
 import { ActionsList } from './components/ActionsList'
 import { ConfirmActionModal } from './components/ConfirmActionModal'
@@ -13,7 +13,7 @@ import { RepoOrganizer } from './components/RepoOrganizer'
 import { TokenBar } from './components/TokenBar'
 import { ViewTabs, type AppView } from './components/ViewTabs'
 import { prKey } from './domain/prKey'
-import type { PeriodFilterDays } from './domain/filters'
+import { isPinned, type PeriodFilterDays } from './domain/filters'
 import {
   actionNoteKey,
   filterWorkflowRuns,
@@ -29,16 +29,14 @@ import {
   type LocalWorkspaceNoteFilters,
   type NotesScopeFilter,
 } from './domain/workspaceNote'
-import { checkRepoBranch, fetchRepoBranches } from './github'
 import { useActions } from './hooks/useActions'
 import { useAuth } from './hooks/useAuth'
 import { useLocalWorkspace } from './hooks/useLocalWorkspace'
 import { usePrFilters } from './hooks/usePrFilters'
 import { usePullRequests } from './hooks/usePullRequests'
 import { useTheme } from './hooks/useTheme'
-import { isPinned } from './storage/pins'
 import {
-  reposInFolder,
+  reposForScope,
   toggleFolderCollapsed,
   type SidebarScope,
 } from './storage/repoLayout'
@@ -64,19 +62,22 @@ type NoteNavPending =
  */
 export default function App() {
   const auth = useAuth()
-  const workspace = useLocalWorkspace()
+  const workspace = useLocalWorkspace(auth.token)
   const filters = usePrFilters()
   const { theme, toggleTheme } = useTheme()
   const [view, setView] = useState<AppView>('prs')
   const [actionsQuery, setActionsQuery] = useState('')
   const [actionsStatus, setActionsStatus] = useState<ActionsStatusFilter>('all')
-  const [actionsWithinDays, setActionsWithinDays] = useState<PeriodFilterDays>(0)
+  const [actionsWithinDays, setActionsWithinDays] =
+    useState<PeriodFilterDays>(0)
   const [actionsNotesOnly, setActionsNotesOnly] = useState(false)
   const [dispatchOpen, setDispatchOpen] = useState(false)
   const [noteFilters, setNoteFilters] =
     useState<LocalWorkspaceNoteFilters>(DEFAULT_NOTE_FILTERS)
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null)
-  const [noteNavPending, setNoteNavPending] = useState<NoteNavPending | null>(null)
+  const [noteNavPending, setNoteNavPending] = useState<NoteNavPending | null>(
+    null,
+  )
   const noteDirtyRef = useRef(false)
   const noteSaveRef = useRef<(() => void) | null>(null)
 
@@ -122,22 +123,29 @@ export default function App() {
 
   const notesScopeFilter: NotesScopeFilter = useMemo(() => {
     if (workspace.scope.type === 'network') return { type: 'network' }
-    if (workspace.scope.type === 'repo') {
-      return {
-        type: 'repos',
-        repos: [workspace.scope.name],
-        excludeGeneral: noteFilters.excludeGeneral,
-      }
-    }
     return {
       type: 'repos',
-      repos: reposInFolder(workspace.layout, workspace.scope.id, prData.viewerRepos),
+      repos: reposForScope(
+        workspace.scope,
+        workspace.layout,
+        prData.viewerRepos,
+      ),
       excludeGeneral: noteFilters.excludeGeneral,
     }
-  }, [workspace.scope, workspace.layout, prData.viewerRepos, noteFilters.excludeGeneral])
+  }, [
+    workspace.scope,
+    workspace.layout,
+    prData.viewerRepos,
+    noteFilters.excludeGeneral,
+  ])
 
   const filteredNotes = useMemo(
-    () => filterWorkspaceNotes(workspace.workspaceNotes, noteFilters, notesScopeFilter),
+    () =>
+      filterWorkspaceNotes(
+        workspace.workspaceNotes,
+        noteFilters,
+        notesScopeFilter,
+      ),
     [workspace.workspaceNotes, noteFilters, notesScopeFilter],
   )
 
@@ -173,50 +181,44 @@ export default function App() {
     ? workspace.layout.folders.find((f) => f.id === folderScope.id)?.name
     : null
 
-  const scopeReposCount = folderScope
-    ? reposInFolder(workspace.layout, folderScope.id, prData.viewerRepos).length
-    : 0
-
-  const dispatchRepos = useMemo(() => {
-    if (workspace.scope.type === 'repo') return [workspace.scope.name]
-    if (workspace.scope.type === 'folder') {
-      return reposInFolder(workspace.layout, workspace.scope.id, prData.viewerRepos)
-    }
-    return []
-  }, [workspace.scope, workspace.layout, prData.viewerRepos])
+  const dispatchRepos = useMemo(
+    () =>
+      reposForScope(
+        workspace.scope,
+        workspace.layout,
+        prData.viewerRepos,
+        'empty',
+      ),
+    [workspace.scope, workspace.layout, prData.viewerRepos],
+  )
 
   /** Repos oferecidos no vínculo da nota — respeita escopo (rede = todos). */
-  const noteRepos = useMemo(() => {
-    if (workspace.scope.type === 'repo') return [workspace.scope.name]
-    if (workspace.scope.type === 'folder') {
-      return reposInFolder(workspace.layout, workspace.scope.id, prData.viewerRepos)
-    }
-    return prData.viewerRepos
-  }, [workspace.scope, workspace.layout, prData.viewerRepos])
+  const noteRepos = useMemo(
+    () =>
+      reposForScope(
+        workspace.scope,
+        workspace.layout,
+        prData.viewerRepos,
+        'all',
+      ),
+    [workspace.scope, workspace.layout, prData.viewerRepos],
+  )
+
+  const scopeReposCount = folderScope ? dispatchRepos.length : 0
 
   const dispatchInitialRepo =
     workspace.scope.type === 'repo'
       ? workspace.scope.name
       : (actions.selectedRun?.repo ?? dispatchRepos[0] ?? null)
 
-  const headerError = view === 'actions' ? actions.error : view === 'prs' ? prData.error : null
-  const loading = view === 'actions' ? actions.loading : view === 'prs' ? prData.loading : false
-
-  const loadNoteBranches = useCallback(
-    async (repo: string) => {
-      if (!auth.token) return []
-      return fetchRepoBranches(auth.token, repo)
-    },
-    [auth.token],
-  )
-
-  const checkNoteBranch = useCallback(
-    async (repo: string, branch: string) => {
-      if (!auth.token) throw new Error('Salve um Personal Access Token para verificar branches.')
-      return checkRepoBranch(auth.token, repo, branch)
-    },
-    [auth.token],
-  )
+  const headerError =
+    view === 'actions' ? actions.error : view === 'prs' ? prData.error : null
+  const loading =
+    view === 'actions'
+      ? actions.loading
+      : view === 'prs'
+        ? prData.loading
+        : false
 
   const handleSave = () => {
     const next = auth.save()
@@ -243,8 +245,8 @@ export default function App() {
   const createBlankNote = () => {
     const link =
       workspace.scope.type === 'repo'
-        ? ({ type: 'repo' as const, repo: workspace.scope.name })
-        : ({ type: 'none' as const })
+        ? { type: 'repo' as const, repo: workspace.scope.name }
+        : { type: 'none' as const }
     const note = createWorkspaceNote({ link })
     workspace.upsertNote(note)
     setSelectedNoteId(note.id)
@@ -307,7 +309,8 @@ export default function App() {
     setSelectedNoteId((cur) => (cur === id ? null : cur))
   }
 
-  const actionsNetworkHint = view === 'actions' && workspace.scope.type === 'network'
+  const actionsNetworkHint =
+    view === 'actions' && workspace.scope.type === 'network'
 
   const loadedCount =
     view === 'actions'
@@ -334,10 +337,14 @@ export default function App() {
           theme={theme}
           onToggleTheme={toggleTheme}
         />
-        {headerError && <div className="banner banner-error">{headerError}</div>}
+        {headerError && (
+          <div className="banner banner-error">{headerError}</div>
+        )}
       </header>
 
-      <div className={`app-shell${workspace.sidebarCollapsed ? ' is-sidebar-collapsed' : ''}`}>
+      <div
+        className={`app-shell${workspace.sidebarCollapsed ? ' is-sidebar-collapsed' : ''}`}
+      >
         <aside className="sidebar" aria-hidden={workspace.sidebarCollapsed}>
           <div className="sidebar-body">
             <RepoList
@@ -346,7 +353,9 @@ export default function App() {
               scope={workspace.scope}
               onSelectScope={handleSelectScope}
               onToggleFolder={(id) =>
-                workspace.updateLayout(toggleFolderCollapsed(workspace.layout, id))
+                workspace.updateLayout(
+                  toggleFolderCollapsed(workspace.layout, id),
+                )
               }
               onOrganize={() => workspace.setOrganizerOpen(true)}
               loadedCount={loadedCount}
@@ -382,9 +391,15 @@ export default function App() {
               type="button"
               className="btn-sidebar-toggle"
               onClick={workspace.toggleSidebar}
-              title={workspace.sidebarCollapsed ? 'Expandir sidebar' : 'Colapsar sidebar'}
+              title={
+                workspace.sidebarCollapsed
+                  ? 'Expandir sidebar'
+                  : 'Colapsar sidebar'
+              }
               aria-label={
-                workspace.sidebarCollapsed ? 'Expandir sidebar' : 'Colapsar sidebar'
+                workspace.sidebarCollapsed
+                  ? 'Expandir sidebar'
+                  : 'Colapsar sidebar'
               }
               aria-expanded={!workspace.sidebarCollapsed}
             >
@@ -435,8 +450,9 @@ export default function App() {
             ) : !auth.token && !loading ? (
               <div className="graph-empty">
                 <p>
-                  Cole um Personal Access Token acima e clique em <strong>Salvar</strong> para
-                  carregar {view === 'actions' ? 'Actions' : 'PRs'}.
+                  Cole um Personal Access Token acima e clique em{' '}
+                  <strong>Salvar</strong> para carregar{' '}
+                  {view === 'actions' ? 'Actions' : 'PRs'}.
                 </p>
               </div>
             ) : view === 'prs' ? (
@@ -474,7 +490,9 @@ export default function App() {
                 notes={workspace.notes}
                 loading={actions.loading}
                 canDispatch={dispatchRepos.length > 0}
-                dispatchDisabled={!auth.token || actions.mutating || actions.loading}
+                dispatchDisabled={
+                  !auth.token || actions.mutating || actions.loading
+                }
                 onDispatchClick={() => setDispatchOpen(true)}
               />
             )}
@@ -485,8 +503,9 @@ export default function App() {
               pr={prData.selectedPr}
               note={
                 prData.selectedPr
-                  ? (workspace.notes[prKey(prData.selectedPr.repo, prData.selectedPr.number)] ??
-                    '')
+                  ? (workspace.notes[
+                      prKey(prData.selectedPr.repo, prData.selectedPr.number)
+                    ] ?? '')
                   : ''
               }
               pinned={
@@ -510,7 +529,10 @@ export default function App() {
               note={
                 actions.selectedRun
                   ? (workspace.notes[
-                      actionNoteKey(actions.selectedRun.repo, actions.selectedRun.id)
+                      actionNoteKey(
+                        actions.selectedRun.repo,
+                        actions.selectedRun.id,
+                      )
                     ] ?? '')
                   : ''
               }
@@ -526,8 +548,8 @@ export default function App() {
               repos={noteRepos}
               token={auth.token}
               suggestedPr={suggestedPr}
-              loadBranches={loadNoteBranches}
-              checkBranch={checkNoteBranch}
+              loadBranches={workspace.loadBranches}
+              checkBranch={workspace.checkBranch}
               onChange={workspace.upsertNote}
               onDelete={handleDeleteNote}
               onClose={() => {

@@ -70,8 +70,12 @@ export function TokenBar({
         type="button"
         className="btn btn-theme"
         onClick={onToggleTheme}
-        title={theme === 'dark' ? 'Mudar para tema claro' : 'Mudar para tema escuro'}
-        aria-label={theme === 'dark' ? 'Mudar para tema claro' : 'Mudar para tema escuro'}
+        title={
+          theme === 'dark' ? 'Mudar para tema claro' : 'Mudar para tema escuro'
+        }
+        aria-label={
+          theme === 'dark' ? 'Mudar para tema claro' : 'Mudar para tema escuro'
+        }
       >
         {theme === 'dark' ? 'Claro' : 'Escuro'}
       </button>

@@ -43,7 +43,11 @@ export function ConfirmActionModal({
   if (!open) return null
 
   const modal = (
-    <div className="org-overlay confirm-overlay" role="presentation" onClick={onCancel}>
+    <div
+      className="org-overlay confirm-overlay"
+      role="presentation"
+      onClick={onCancel}
+    >
       <div
         className="org-modal confirm-modal"
         role="dialog"
@@ -68,13 +72,17 @@ export function ConfirmActionModal({
         </header>
 
         <div className="confirm-body">
-          {lead != null && lead !== '' ? <p className="confirm-lead">{lead}</p> : null}
+          {lead != null && lead !== '' ? (
+            <p className="confirm-lead">{lead}</p>
+          ) : null}
           {details.length > 0 ? (
             <dl className="confirm-details">
               {details.map((row) => (
                 <div key={row.label} className="confirm-details-row">
                   <dt>{row.label}</dt>
-                  <dd className={row.mono ? 'is-mono' : undefined}>{row.value || '—'}</dd>
+                  <dd className={row.mono ? 'is-mono' : undefined}>
+                    {row.value || '—'}
+                  </dd>
                 </div>
               ))}
             </dl>
@@ -82,7 +90,12 @@ export function ConfirmActionModal({
         </div>
 
         <footer className="org-footer confirm-footer">
-          <button type="button" className="btn" onClick={onCancel} disabled={busy}>
+          <button
+            type="button"
+            className="btn"
+            onClick={onCancel}
+            disabled={busy}
+          >
             {cancelLabel}
           </button>
           {secondaryLabel && onSecondary ? (

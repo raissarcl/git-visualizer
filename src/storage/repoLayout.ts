@@ -33,7 +33,9 @@ function normalizeFolders(raw: unknown): RepoFolder[] {
 
   return raw
     .filter((item): item is Record<string, unknown> => isRecord(item))
-    .filter((item) => typeof item.id === 'string' && typeof item.name === 'string')
+    .filter(
+      (item) => typeof item.id === 'string' && typeof item.name === 'string',
+    )
     .map((item) => ({
       id: item.id as string,
       name: item.name as string,
@@ -42,13 +44,17 @@ function normalizeFolders(raw: unknown): RepoFolder[] {
     }))
 }
 
-function migrateFoldersByRepo(raw: Record<string, unknown>): Record<string, string[]> {
+function migrateFoldersByRepo(
+  raw: Record<string, unknown>,
+): Record<string, string[]> {
   if (isRecord(raw.foldersByRepo) && !Array.isArray(raw.foldersByRepo)) {
     const out: Record<string, string[]> = {}
 
     for (const [repo, value] of Object.entries(raw.foldersByRepo)) {
       if (!Array.isArray(value)) continue
-      const ids = value.filter((id): id is string => typeof id === 'string' && id.length > 0)
+      const ids = value.filter(
+        (id): id is string => typeof id === 'string' && id.length > 0,
+      )
       if (ids.length > 0) out[repo] = [...new Set(ids)]
     }
 
@@ -121,7 +127,11 @@ export function isRepoHidden(layout: RepoLayout, repo: string): boolean {
   return layout.hidden.includes(repo)
 }
 
-export function setRepoHidden(layout: RepoLayout, repo: string, hidden: boolean): RepoLayout {
+export function setRepoHidden(
+  layout: RepoLayout,
+  repo: string,
+  hidden: boolean,
+): RepoLayout {
   const set = new Set(layout.hidden)
   if (hidden) set.add(repo)
   else set.delete(repo)
@@ -132,7 +142,11 @@ export function folderIdsForRepo(layout: RepoLayout, repo: string): string[] {
   return layout.foldersByRepo[repo] ?? []
 }
 
-export function isRepoInFolder(layout: RepoLayout, repo: string, folderId: string): boolean {
+export function isRepoInFolder(
+  layout: RepoLayout,
+  repo: string,
+  folderId: string,
+): boolean {
   return folderIdsForRepo(layout, repo).includes(folderId)
 }
 
@@ -160,17 +174,26 @@ export function createFolder(
   }
 }
 
-export function renameFolder(layout: RepoLayout, folderId: string, name: string): RepoLayout {
+export function renameFolder(
+  layout: RepoLayout,
+  folderId: string,
+  name: string,
+): RepoLayout {
   const trimmed = name.trim()
   if (!trimmed) return layout
   return {
     ...layout,
-    folders: layout.folders.map((f) => (f.id === folderId ? { ...f, name: trimmed } : f)),
+    folders: layout.folders.map((f) =>
+      f.id === folderId ? { ...f, name: trimmed } : f,
+    ),
   }
 }
 
 /** Ids da pasta e de toda a subárvore. */
-export function collectSubtreeIds(layout: RepoLayout, folderId: string): Set<string> {
+export function collectSubtreeIds(
+  layout: RepoLayout,
+  folderId: string,
+): Set<string> {
   const ids = new Set<string>([folderId])
   let grew = true
 
@@ -281,7 +304,25 @@ export type SidebarScope =
   | { type: 'repo'; name: string }
   | { type: 'folder'; id: string }
 
-export function toggleFolderCollapsed(layout: RepoLayout, folderId: string): RepoLayout {
+/**
+ * Repos do escopo atual.
+ * Em `network`, `networkFallback: 'all'` devolve todos; `'empty'` devolve [].
+ */
+export function reposForScope(
+  scope: SidebarScope,
+  layout: RepoLayout,
+  allRepos: string[],
+  networkFallback: 'empty' | 'all' = 'empty',
+): string[] {
+  if (scope.type === 'repo') return [scope.name]
+  if (scope.type === 'folder') return reposInFolder(layout, scope.id, allRepos)
+  return networkFallback === 'all' ? allRepos : []
+}
+
+export function toggleFolderCollapsed(
+  layout: RepoLayout,
+  folderId: string,
+): RepoLayout {
   return {
     ...layout,
     folders: layout.folders.map((f) =>
@@ -301,7 +342,10 @@ export interface SidebarTree {
   uncategorized: string[]
 }
 
-function childFolders(layout: RepoLayout, parentId: string | null): RepoFolder[] {
+function childFolders(
+  layout: RepoLayout,
+  parentId: string | null,
+): RepoFolder[] {
   return layout.folders.filter((f) => f.parentId === parentId)
 }
 
@@ -320,11 +364,16 @@ function buildNode(
 }
 
 /** Árvore de pastas + repos sem pasta (visível). */
-export function buildSidebarTree(repos: string[], layout: RepoLayout): SidebarTree {
+export function buildSidebarTree(
+  repos: string[],
+  layout: RepoLayout,
+): SidebarTree {
   const visible = repos.filter((r) => !isRepoHidden(layout, r))
 
   return {
-    roots: childFolders(layout, null).map((folder) => buildNode(layout, folder, visible)),
+    roots: childFolders(layout, null).map((folder) =>
+      buildNode(layout, folder, visible),
+    ),
     uncategorized: visible.filter((r) => isRepoUncategorized(layout, r)),
   }
 }

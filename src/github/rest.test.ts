@@ -11,6 +11,8 @@ describe('parseLinkNext', () => {
     const link =
       '<https://api.github.com/repos/a/b/branches?page=2>; rel="next", ' +
       '<https://api.github.com/repos/a/b/branches?page=1>; rel="prev"'
-    expect(parseLinkNext(link)).toBe('https://api.github.com/repos/a/b/branches?page=2')
+    expect(parseLinkNext(link)).toBe(
+      'https://api.github.com/repos/a/b/branches?page=2',
+    )
   })
 })

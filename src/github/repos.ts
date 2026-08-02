@@ -11,14 +11,20 @@ const MAX_REPO_PAGES = 3
 async function paginateRepoNames(
   token: string,
   query: string,
-  pick: (data: NonNullable<ViewerReposResponse['data']>['viewer']) => ViewerReposPage | undefined,
+  pick: (
+    data: NonNullable<ViewerReposResponse['data']>['viewer'],
+  ) => ViewerReposPage | undefined,
 ): Promise<string[]> {
   const names: string[] = []
   let after: string | null = null
   let pages = 0
 
   while (pages < MAX_REPO_PAGES) {
-    const json: ViewerReposResponse = await graphql<ViewerReposResponse>(token, query, { after })
+    const json: ViewerReposResponse = await graphql<ViewerReposResponse>(
+      token,
+      query,
+      { after },
+    )
     const page: ViewerReposPage | undefined = json.data?.viewer
       ? pick(json.data.viewer)
       : undefined
@@ -40,7 +46,11 @@ async function paginateRepoNames(
 export async function fetchViewerRepos(token: string): Promise<string[]> {
   const [owned, contributed] = await Promise.all([
     paginateRepoNames(token, VIEWER_OWNED_REPOS, (v) => v.repositories),
-    paginateRepoNames(token, VIEWER_CONTRIBUTED_REPOS, (v) => v.repositoriesContributedTo),
+    paginateRepoNames(
+      token,
+      VIEWER_CONTRIBUTED_REPOS,
+      (v) => v.repositoriesContributedTo,
+    ),
   ])
 
   return [...new Set([...owned, ...contributed])].sort((a, b) =>

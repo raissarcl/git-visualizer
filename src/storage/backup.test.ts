@@ -102,7 +102,9 @@ describe('parseBackupJson', () => {
   })
 
   it('rejects wrong version', () => {
-    expect(() => parseBackupJson(JSON.stringify({ version: 99 }))).toThrow(/version/)
+    expect(() => parseBackupJson(JSON.stringify({ version: 99 }))).toThrow(
+      /version/,
+    )
   })
 })
 

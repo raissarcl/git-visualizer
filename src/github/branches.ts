@@ -6,7 +6,8 @@ import { restGetOrNull } from './rest'
 
 function splitRepo(fullName: string): { owner: string; repo: string } {
   const [owner, repo] = fullName.split('/')
-  if (!owner || !repo) throw new Error(`Nome de repositório inválido: ${fullName}`)
+  if (!owner || !repo)
+    throw new Error(`Nome de repositório inválido: ${fullName}`)
   return { owner, repo }
 }
 

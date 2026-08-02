@@ -57,7 +57,10 @@ function FolderNavItem({
   return (
     <li>
       {renamingId === folder.id ? (
-        <div className="org-folder-rename" style={{ paddingLeft: `${depth * 12}px` }}>
+        <div
+          className="org-folder-rename"
+          style={{ paddingLeft: `${depth * 12}px` }}
+        >
           <input
             type="text"
             value={renameValue}
@@ -138,7 +141,13 @@ function FolderNavItem({
   )
 }
 
-export function RepoOrganizer({ open, repos, layout, onChange, onClose }: RepoOrganizerProps) {
+export function RepoOrganizer({
+  open,
+  repos,
+  layout,
+  onChange,
+  onClose,
+}: RepoOrganizerProps) {
   const [draft, setDraft] = useState<RepoLayout>(() => cloneLayout(layout))
   const [newFolderName, setNewFolderName] = useState('')
   const [renamingId, setRenamingId] = useState<string | null>(null)
@@ -162,7 +171,10 @@ export function RepoOrganizer({ open, repos, layout, onChange, onClose }: RepoOr
 
   useEffect(() => {
     if (!open) return
-    if (active !== 'uncategorized' && !draft.folders.some((f) => f.id === active)) {
+    if (
+      active !== 'uncategorized' &&
+      !draft.folders.some((f) => f.id === active)
+    ) {
       setActive('uncategorized')
     }
   }, [open, active, draft.folders])
@@ -238,14 +250,19 @@ export function RepoOrganizer({ open, repos, layout, onChange, onClose }: RepoOr
 
   const clearAllInFolder = () => {
     if (active === 'uncategorized') return
-    const toClear = filteredRepos.filter((r) => isRepoInFolder(draft, r, active))
+    const toClear = filteredRepos.filter((r) =>
+      isRepoInFolder(draft, r, active),
+    )
     setDraft(removeReposFromFolder(draft, toClear, active))
   }
 
   const activeFolder =
-    active === 'uncategorized' ? null : draft.folders.find((f) => f.id === active)
+    active === 'uncategorized'
+      ? null
+      : draft.folders.find((f) => f.id === active)
 
-  const activeLabel = active === 'uncategorized' ? 'Sem pasta' : (activeFolder?.name ?? 'Pasta')
+  const activeLabel =
+    active === 'uncategorized' ? 'Sem pasta' : (activeFolder?.name ?? 'Pasta')
 
   const canBulk = active !== 'uncategorized'
 
@@ -267,7 +284,12 @@ export function RepoOrganizer({ open, repos, layout, onChange, onClose }: RepoOr
             <h2 id="org-title">Organizar repositórios</h2>
             <p className="org-subtitle">{repos.length} repos disponíveis</p>
           </div>
-          <button type="button" className="detail-close" onClick={requestClose} aria-label="Fechar">
+          <button
+            type="button"
+            className="detail-close"
+            onClick={requestClose}
+            aria-label="Fechar"
+          >
             ×
           </button>
         </header>
@@ -285,7 +307,11 @@ export function RepoOrganizer({ open, repos, layout, onChange, onClose }: RepoOr
                   if (e.key === 'Enter') handleCreateFolder()
                 }}
               />
-              <button type="button" className="btn btn-primary" onClick={handleCreateFolder}>
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={handleCreateFolder}
+              >
                 Criar
               </button>
             </div>
@@ -332,10 +358,18 @@ export function RepoOrganizer({ open, repos, layout, onChange, onClose }: RepoOr
             />
             {canBulk && (
               <div className="org-bulk-actions">
-                <button type="button" className="btn" onClick={selectAllInFolder}>
+                <button
+                  type="button"
+                  className="btn"
+                  onClick={selectAllInFolder}
+                >
                   Selecionar todos
                 </button>
-                <button type="button" className="btn" onClick={clearAllInFolder}>
+                <button
+                  type="button"
+                  className="btn"
+                  onClick={clearAllInFolder}
+                >
                   Limpar seleção
                 </button>
               </div>
@@ -359,15 +393,21 @@ export function RepoOrganizer({ open, repos, layout, onChange, onClose }: RepoOr
                           type="checkbox"
                           checked={inFolder}
                           disabled={active === 'uncategorized'}
-                          onChange={(e) => toggleInActiveFolder(repo, e.target.checked)}
+                          onChange={(e) =>
+                            toggleInActiveFolder(repo, e.target.checked)
+                          }
                         />
                         <span title={repo}>{repo}</span>
                       </label>
                       <button
                         type="button"
                         className={`btn-vis${visible ? ' is-on' : ''}`}
-                        onClick={() => setDraft(setRepoHidden(draft, repo, visible))}
-                        title={visible ? 'Ocultar da sidebar' : 'Mostrar na sidebar'}
+                        onClick={() =>
+                          setDraft(setRepoHidden(draft, repo, visible))
+                        }
+                        title={
+                          visible ? 'Ocultar da sidebar' : 'Mostrar na sidebar'
+                        }
                       >
                         {visible ? 'Visível' : 'Oculto'}
                       </button>
@@ -383,7 +423,12 @@ export function RepoOrganizer({ open, repos, layout, onChange, onClose }: RepoOr
           <button type="button" className="btn" onClick={requestClose}>
             Cancelar
           </button>
-          <button type="button" className="btn btn-primary" onClick={handleSave} disabled={!dirty}>
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={handleSave}
+            disabled={!dirty}
+          >
             Salvar
           </button>
         </footer>

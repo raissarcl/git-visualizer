@@ -7,7 +7,9 @@ import type { WorkflowInput, WorkflowInputType } from '../domain/workflowRun'
 
 const { CORE_SCHEMA, load: loadYaml } = jsyaml
 /** Schema 1.1 — promove `on:` para chave boolean/`"true"`. */
-const YAML11_SCHEMA = (jsyaml as typeof jsyaml & { YAML11_SCHEMA: jsyaml.Schema }).YAML11_SCHEMA
+const YAML11_SCHEMA = (
+  jsyaml as typeof jsyaml & { YAML11_SCHEMA: jsyaml.Schema }
+).YAML11_SCHEMA
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value)
@@ -15,13 +17,20 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function asString(value: unknown, fallback = ''): string {
   if (typeof value === 'string') return value
-  if (typeof value === 'number' || typeof value === 'boolean') return String(value)
+  if (typeof value === 'number' || typeof value === 'boolean')
+    return String(value)
   return fallback
 }
 
 function normalizeType(raw: unknown): WorkflowInputType {
   const t = asString(raw, 'string').toLowerCase()
-  if (t === 'boolean' || t === 'choice' || t === 'environment' || t === 'number') return t
+  if (
+    t === 'boolean' ||
+    t === 'choice' ||
+    t === 'environment' ||
+    t === 'number'
+  )
+    return t
   return 'string'
 }
 
@@ -94,7 +103,9 @@ function mapInput(name: string, raw: unknown): WorkflowInput {
   }
 }
 
-function inputsFromDispatch(dispatch: Record<string, unknown>): WorkflowInput[] {
+function inputsFromDispatch(
+  dispatch: Record<string, unknown>,
+): WorkflowInput[] {
   const inputsRaw = dispatch.inputs
   if (!isRecord(inputsRaw)) return []
   return Object.entries(inputsRaw).map(([name, value]) => mapInput(name, value))
@@ -113,7 +124,10 @@ function tryParseDoc(yamlText: string, schema: jsyaml.Schema): unknown {
   return loadYaml(yamlText, { schema })
 }
 
-function resultFromDoc(doc: unknown, rawMentionsDispatch: boolean): WorkflowDispatchParseResult {
+function resultFromDoc(
+  doc: unknown,
+  rawMentionsDispatch: boolean,
+): WorkflowDispatchParseResult {
   if (!isRecord(doc)) {
     return {
       inputs: null,
@@ -141,7 +155,9 @@ function resultFromDoc(doc: unknown, rawMentionsDispatch: boolean): WorkflowDisp
 /**
  * Parse detalhado — preferir CORE_SCHEMA; fallback DEFAULT (chave `on` → `true`).
  */
-export function parseWorkflowDispatchDetailed(yamlText: string): WorkflowDispatchParseResult {
+export function parseWorkflowDispatchDetailed(
+  yamlText: string,
+): WorkflowDispatchParseResult {
   const rawMentionsDispatch = /workflow_dispatch/i.test(yamlText)
 
   try {
@@ -177,6 +193,8 @@ export function parseWorkflowDispatchDetailed(yamlText: string): WorkflowDispatc
 /**
  * Retorna inputs de `on.workflow_dispatch`, ou `null` se o workflow não tiver dispatch.
  */
-export function parseWorkflowDispatchInputs(yamlText: string): WorkflowInput[] | null {
+export function parseWorkflowDispatchInputs(
+  yamlText: string,
+): WorkflowInput[] | null {
   return parseWorkflowDispatchDetailed(yamlText).inputs
 }

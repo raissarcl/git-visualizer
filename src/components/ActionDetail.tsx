@@ -7,7 +7,7 @@ import {
   runBadgeKind,
   runBadgeLabel,
 } from '../domain/workflowRun'
-import { hasNote } from '../storage/notes'
+import { hasNote } from '../domain/filters'
 import { ConfirmActionModal, type ConfirmDetailRow } from './ConfirmActionModal'
 import { CopyableCode } from './CopyableCode'
 import { DetailDrawer } from './DetailDrawer'
@@ -37,7 +37,10 @@ function formatDate(iso: string): string {
 
 function pickRunInput(inputs: Record<string, string>, names: string[]): string {
   const byLower = new Map(
-    Object.entries(inputs).map(([key, value]) => [key.toLowerCase().replace(/-/g, '_'), value]),
+    Object.entries(inputs).map(([key, value]) => [
+      key.toLowerCase().replace(/-/g, '_'),
+      value,
+    ]),
   )
   for (const name of names) {
     const value = byLower.get(name.toLowerCase().replace(/-/g, '_'))?.trim()
@@ -74,7 +77,12 @@ export function ActionDetail({
 
   const confirmMeta = useMemo(() => {
     if (!run || !pending) {
-      return { title: '', subtitle: '', confirmLabel: 'Confirmar', details: [] as ConfirmDetailRow[] }
+      return {
+        title: '',
+        subtitle: '',
+        confirmLabel: 'Confirmar',
+        details: [] as ConfirmDetailRow[],
+      }
     }
 
     const branchRef =
@@ -151,180 +159,207 @@ export function ActionDetail({
 
   return (
     <>
-    <DetailDrawer aria-label="Detalhe do run" onClose={onClose}>
-      <div className="detail-toolbar">
-        <button type="button" className="detail-close" onClick={onClose} aria-label="Fechar">
-          ×
-        </button>
-      </div>
+      <DetailDrawer aria-label="Detalhe do run" onClose={onClose}>
+        <div className="detail-toolbar">
+          <button
+            type="button"
+            className="detail-close"
+            onClick={onClose}
+            aria-label="Fechar"
+          >
+            ×
+          </button>
+        </div>
 
-      <p className="detail-eyebrow">
-        {run.repo} · run #{run.runNumber}
-      </p>
-      <h2>{run.displayTitle}</h2>
+        <p className="detail-eyebrow">
+          {run.repo} · run #{run.runNumber}
+        </p>
+        <h2>{run.displayTitle}</h2>
 
-      <div className="detail-meta-row">
-        <span className={`badge badge-run-${kind}`}>{runBadgeLabel(run)}</span>
-        <span className="detail-meta-muted">{run.name}</span>
-      </div>
+        <div className="detail-meta-row">
+          <span className={`badge badge-run-${kind}`}>
+            {runBadgeLabel(run)}
+          </span>
+          <span className="detail-meta-muted">{run.name}</span>
+        </div>
 
-      <dl className="detail-facts">
-        <div>
-          <dt>Branch ref</dt>
-          <dd>
-            {branchRef.trim() ? (
-              <CopyableCode value={branchRef} className="branch" />
-            ) : (
-              <span className="note-cell-empty">—</span>
-            )}
-          </dd>
-        </div>
-        <div>
-          <dt>Evento</dt>
-          <dd>{run.event}</dd>
-        </div>
-        <div>
-          <dt>Autor</dt>
-          <dd>{run.actorLogin}</dd>
-        </div>
-        <div>
-          <dt>Criado</dt>
-          <dd>{formatDate(run.createdAt)}</dd>
-        </div>
-        <div>
-          <dt>Atualizado</dt>
-          <dd>{formatDate(run.updatedAt)}</dd>
-        </div>
-        {Object.keys(run.inputs).length > 0 && (
-          <div className="detail-facts-inputs">
-            <dt>Inputs</dt>
+        <dl className="detail-facts">
+          <div>
+            <dt>Branch ref</dt>
             <dd>
-              <ul className="run-inputs-list">
-                {Object.entries(run.inputs).map(([name, value]) => (
-                  <li key={name}>
-                    <code>{name}</code>
-                    <span>{value === '' ? '(vazio)' : value}</span>
-                  </li>
-                ))}
-              </ul>
+              {branchRef.trim() ? (
+                <CopyableCode value={branchRef} className="branch" />
+              ) : (
+                <span className="note-cell-empty">—</span>
+              )}
             </dd>
           </div>
-        )}
-      </dl>
-
-      <div className="detail-actions">
-        <a className="btn btn-primary" href={run.htmlUrl} target="_blank" rel="noreferrer">
-          Abrir no GitHub
-        </a>
-        {canCancel(run) && (
-          <button
-            type="button"
-            className="btn"
-            disabled={mutating || confirmLoading}
-            onClick={() => openConfirm('cancel')}
-          >
-            Cancelar
-          </button>
-        )}
-        {canRerun(run) && (
-          <button
-            type="button"
-            className="btn"
-            disabled={mutating || confirmLoading}
-            onClick={() => openConfirm('rerun')}
-          >
-            Rerun
-          </button>
-        )}
-      </div>
-
-      <section className="detail-jobs">
-        <h3>Jobs</h3>
-        {jobsLoading ? (
-          <p className="detail-meta-muted">Carregando jobs…</p>
-        ) : jobs.length === 0 ? (
-          <p className="detail-meta-muted">Nenhum job listado.</p>
-        ) : (
-          <ul className="jobs-list">
-            {jobs.map((job) => {
-              const jobKind = runBadgeKind(job)
-              return (
-                <li key={job.id} className="jobs-list-item">
-                  <span className={`badge badge-run-${jobKind}`}>{runBadgeLabel(job)}</span>
-                  <span className="jobs-list-name">{job.name}</span>
-                  <a href={job.htmlUrl} target="_blank" rel="noreferrer" className="jobs-list-link">
-                    ver
-                  </a>
-                </li>
-              )
-            })}
-          </ul>
-        )}
-      </section>
-
-      <div className="detail-notes">
-        <div className="detail-notes-heading">
-          <h3>Notas</h3>
-          {noteFilled && <span className="note-badge" title="Tem nota local">nota</span>}
-          <div className="notes-mode-tabs" role="tablist" aria-label="Modo das notas">
-            <button
-              type="button"
-              role="tab"
-              className={notesMode === 'edit' ? 'is-active' : undefined}
-              aria-selected={notesMode === 'edit'}
-              onClick={() => setNotesMode('edit')}
-            >
-              Editar
-            </button>
-            <button
-              type="button"
-              role="tab"
-              className={notesMode === 'preview' ? 'is-active' : undefined}
-              aria-selected={notesMode === 'preview'}
-              onClick={() => setNotesMode('preview')}
-            >
-              Preview
-            </button>
+          <div>
+            <dt>Evento</dt>
+            <dd>{run.event}</dd>
           </div>
+          <div>
+            <dt>Autor</dt>
+            <dd>{run.actorLogin}</dd>
+          </div>
+          <div>
+            <dt>Criado</dt>
+            <dd>{formatDate(run.createdAt)}</dd>
+          </div>
+          <div>
+            <dt>Atualizado</dt>
+            <dd>{formatDate(run.updatedAt)}</dd>
+          </div>
+          {Object.keys(run.inputs).length > 0 && (
+            <div className="detail-facts-inputs">
+              <dt>Inputs</dt>
+              <dd>
+                <ul className="run-inputs-list">
+                  {Object.entries(run.inputs).map(([name, value]) => (
+                    <li key={name}>
+                      <code>{name}</code>
+                      <span>{value === '' ? '(vazio)' : value}</span>
+                    </li>
+                  ))}
+                </ul>
+              </dd>
+            </div>
+          )}
+        </dl>
+
+        <div className="detail-actions">
+          <a
+            className="btn btn-primary"
+            href={run.htmlUrl}
+            target="_blank"
+            rel="noreferrer"
+          >
+            Abrir no GitHub
+          </a>
+          {canCancel(run) && (
+            <button
+              type="button"
+              className="btn"
+              disabled={mutating || confirmLoading}
+              onClick={() => openConfirm('cancel')}
+            >
+              Cancelar
+            </button>
+          )}
+          {canRerun(run) && (
+            <button
+              type="button"
+              className="btn"
+              disabled={mutating || confirmLoading}
+              onClick={() => openConfirm('rerun')}
+            >
+              Rerun
+            </button>
+          )}
         </div>
-        <p className="detail-notes-hint">Salvas só neste navegador</p>
-        {notesMode === 'edit' ? (
-          <textarea
-            className="detail-notes-input"
-            value={draft}
-            onChange={(e) => {
-              const value = e.target.value
-              setDraft(value)
-              persist(value)
-            }}
-            onBlur={() => persist(draft)}
-            placeholder="Ex.: falhou por secret; re-rodar após rotacionar…"
-            rows={8}
-            spellCheck
-          />
-        ) : draft.trim() ? (
-          <div className="detail-body-md detail-notes-preview scrollable">
-            <SafeMarkdown>{draft}</SafeMarkdown>
-          </div>
-        ) : (
-          <p className="detail-body-empty">Nada para pré-visualizar.</p>
-        )}
-      </div>
-    </DetailDrawer>
 
-    <ConfirmActionModal
-      open={pending != null}
-      title={confirmMeta.title}
-      subtitle={confirmMeta.subtitle}
-      details={confirmMeta.details}
-      confirmLabel={confirmMeta.confirmLabel}
-      busy={mutating || confirmLoading}
-      onCancel={() => {
-        setPending(null)
-        setConfirmLoading(false)
-      }}
-      onConfirm={confirmPending}
-    />
+        <section className="detail-jobs">
+          <h3>Jobs</h3>
+          {jobsLoading ? (
+            <p className="detail-meta-muted">Carregando jobs…</p>
+          ) : jobs.length === 0 ? (
+            <p className="detail-meta-muted">Nenhum job listado.</p>
+          ) : (
+            <ul className="jobs-list">
+              {jobs.map((job) => {
+                const jobKind = runBadgeKind(job)
+                return (
+                  <li key={job.id} className="jobs-list-item">
+                    <span className={`badge badge-run-${jobKind}`}>
+                      {runBadgeLabel(job)}
+                    </span>
+                    <span className="jobs-list-name">{job.name}</span>
+                    <a
+                      href={job.htmlUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="jobs-list-link"
+                    >
+                      ver
+                    </a>
+                  </li>
+                )
+              })}
+            </ul>
+          )}
+        </section>
+
+        <div className="detail-notes">
+          <div className="detail-notes-heading">
+            <h3>Notas</h3>
+            {noteFilled && (
+              <span className="note-badge" title="Tem nota local">
+                nota
+              </span>
+            )}
+            <div
+              className="notes-mode-tabs"
+              role="tablist"
+              aria-label="Modo das notas"
+            >
+              <button
+                type="button"
+                role="tab"
+                className={notesMode === 'edit' ? 'is-active' : undefined}
+                aria-selected={notesMode === 'edit'}
+                onClick={() => setNotesMode('edit')}
+              >
+                Editar
+              </button>
+              <button
+                type="button"
+                role="tab"
+                className={notesMode === 'preview' ? 'is-active' : undefined}
+                aria-selected={notesMode === 'preview'}
+                onClick={() => setNotesMode('preview')}
+              >
+                Preview
+              </button>
+            </div>
+          </div>
+          <p className="detail-notes-hint">Salvas só neste navegador</p>
+          {notesMode === 'edit' ? (
+            <textarea
+              className="detail-notes-input"
+              value={draft}
+              onChange={(e) => {
+                const value = e.target.value
+                setDraft(value)
+                persist(value)
+              }}
+              onBlur={() => persist(draft)}
+              placeholder="Ex.: falhou por secret; re-rodar após rotacionar…"
+              rows={8}
+              spellCheck
+            />
+          ) : draft.trim() ? (
+            <div className="detail-body-md detail-notes-preview scrollable">
+              <SafeMarkdown>{draft}</SafeMarkdown>
+            </div>
+          ) : (
+            <p className="detail-body-empty">Nada para pré-visualizar.</p>
+          )}
+        </div>
+      </DetailDrawer>
+
+      <ConfirmActionModal
+        open={pending != null}
+        title={confirmMeta.title}
+        subtitle={confirmMeta.subtitle}
+        details={confirmMeta.details}
+        confirmLabel={confirmMeta.confirmLabel}
+        busy={mutating || confirmLoading}
+        onCancel={() => {
+          setPending(null)
+          setConfirmLoading(false)
+        }}
+        onConfirm={confirmPending}
+      />
     </>
   )
 }

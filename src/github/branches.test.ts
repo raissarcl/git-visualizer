@@ -19,8 +19,12 @@ describe('checkRepoBranch', () => {
 
     vi.stubGlobal('fetch', fetchMock)
 
-    await expect(checkRepoBranch('tok', 'acme/api', 'feat/x')).resolves.toBe('verified')
-    await expect(checkRepoBranch('tok', 'acme/api', 'ghost')).resolves.toBe('missing')
+    await expect(checkRepoBranch('tok', 'acme/api', 'feat/x')).resolves.toBe(
+      'verified',
+    )
+    await expect(checkRepoBranch('tok', 'acme/api', 'ghost')).resolves.toBe(
+      'missing',
+    )
 
     expect(fetchMock.mock.calls[0]![0]).toContain(
       '/repos/acme/api/branches/feat%2Fx',

@@ -15,10 +15,10 @@ Abra a URL do Vite (geralmente `http://localhost:5173`), cole um Personal Access
 
 Crie em [GitHub → Settings → Developer settings → Personal access tokens](https://github.com/settings/tokens).
 
-| Situação | Classic PAT | Fine-grained |
-|----------|-------------|--------------|
-| Só repos públicos | `public_repo` | Contents + Pull requests (read) + **Actions: Read and write** |
-| Repos privados + orgs | `repo` | Contents + Pull requests (read) + **Actions: Read and write** |
+| Situação              | Classic PAT   | Fine-grained                                                  |
+| --------------------- | ------------- | ------------------------------------------------------------- |
+| Só repos públicos     | `public_repo` | Contents + Pull requests (read) + **Actions: Read and write** |
+| Repos privados + orgs | `repo`        | Contents + Pull requests (read) + **Actions: Read and write** |
 
 - Classic: o scope `repo` (ou `public_repo`) cobre PRs e Actions (ler runs, cancelar, rerun, disparar). O scope `workflow` só é necessário se for **editar** arquivos YAML de workflow.
 - Fine-grained: sem **Actions: Read and write**, a aba Actions falha com 403.
@@ -57,9 +57,12 @@ Detalhes em [docs/architecture.md](docs/architecture.md).
 ## Scripts
 
 ```bash
-npm run dev      # desenvolvimento
-npm run build    # produção
-npm run preview  # preview
-npm test         # testes unitários (Vitest)
-npm run lint     # oxlint
+npm run dev           # desenvolvimento
+npm run build         # produção
+npm run preview       # preview
+npm test              # testes unitários (Vitest)
+npm run lint          # oxlint
+npm run format        # Prettier (escreve)
+npm run format:check  # Prettier (só verifica)
+npm run check         # lint + format:check + test + build
 ```

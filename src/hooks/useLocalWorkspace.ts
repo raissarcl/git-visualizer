@@ -1,16 +1,23 @@
 /**
  * Dados locais do visualizador: notes, pins, layout, sidebar, workspace notes, backup.
+ * Verificações de branch no remoto passam por aqui (não pelo App).
  */
 
 import { useCallback, useState } from 'react'
 import type { WorkspaceNote } from '../domain/workspaceNote'
+import { checkRepoBranch, fetchRepoBranches } from '../github'
 import {
   applyImportedData,
   clearLocalData,
   downloadLocalBackup,
   parseBackupJson,
 } from '../storage/backup'
-import { loadNotes, saveNotes, setNote, type PrNotesMap } from '../storage/notes'
+import {
+  loadNotes,
+  saveNotes,
+  setNote,
+  type PrNotesMap,
+} from '../storage/notes'
 import { loadPins, savePins, togglePin, type PinSet } from '../storage/pins'
 import {
   loadSidebarCollapsed,
@@ -35,14 +42,17 @@ function clampScope(scope: SidebarScope, layout: RepoLayout): SidebarScope {
     return { type: 'network' }
   }
 
-  if (scope.type === 'folder' && !layout.folders.some((f) => f.id === scope.id)) {
+  if (
+    scope.type === 'folder' &&
+    !layout.folders.some((f) => f.id === scope.id)
+  ) {
     return { type: 'network' }
   }
 
   return scope
 }
 
-export function useLocalWorkspace() {
+export function useLocalWorkspace(token: string | null) {
   const [layout, setLayout] = useState<RepoLayout>(() => loadRepoLayout())
   const [organizerOpen, setOrganizerOpen] = useState(false)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(loadSidebarCollapsed)
@@ -128,6 +138,26 @@ export function useLocalWorkspace() {
     setScope(next)
   }, [])
 
+  const loadBranches = useCallback(
+    async (repo: string) => {
+      if (!token) return []
+      return fetchRepoBranches(token, repo)
+    },
+    [token],
+  )
+
+  const checkBranch = useCallback(
+    async (repo: string, branch: string) => {
+      if (!token) {
+        throw new Error(
+          'Salve um Personal Access Token para verificar branches.',
+        )
+      }
+      return checkRepoBranch(token, repo, branch)
+    },
+    [token],
+  )
+
   return {
     layout,
     updateLayout,
@@ -148,5 +178,7 @@ export function useLocalWorkspace() {
     downloadLocalBackup,
     handleImportFile,
     handleClearLocalData,
+    loadBranches,
+    checkBranch,
   }
 }

@@ -1,5 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
-import { isBranchLikeInput, type WorkflowInput, type WorkflowSummary } from '../domain/workflowRun'
+import {
+  isBranchLikeInput,
+  type WorkflowInput,
+  type WorkflowSummary,
+} from '../domain/workflowRun'
 import { ConfirmActionModal, type ConfirmDetailRow } from './ConfirmActionModal'
 import { SearchableSelect } from './SearchableSelect'
 
@@ -34,7 +38,9 @@ function defaultsFromInputs(
   for (const input of inputs) {
     if (input.type === 'boolean') {
       out[input.name] =
-        input.defaultValue === 'true' || input.defaultValue === 'True' ? 'true' : 'false'
+        input.defaultValue === 'true' || input.defaultValue === 'True'
+          ? 'true'
+          : 'false'
     } else if (input.type === 'choice' && input.options.length > 0) {
       out[input.name] =
         input.defaultValue && input.options.includes(input.defaultValue)
@@ -56,7 +62,10 @@ function branchOptions(branches: string[], current: string) {
   if (!current.trim() || branches.includes(current)) {
     return branches.map((b) => ({ value: b, label: b }))
   }
-  return [{ value: current, label: current }, ...branches.map((b) => ({ value: b, label: b }))]
+  return [
+    { value: current, label: current },
+    ...branches.map((b) => ({ value: b, label: b })),
+  ]
 }
 
 export function DispatchModal({
@@ -101,7 +110,10 @@ export function DispatchModal({
 
   useEffect(() => {
     if (!open) return
-    const startRepo = initialRepo && repos.includes(initialRepo) ? initialRepo : (repos[0] ?? '')
+    const startRepo =
+      initialRepo && repos.includes(initialRepo)
+        ? initialRepo
+        : (repos[0] ?? '')
     setRepo(startRepo)
     setWorkflows([])
     setWorkflowId(null)
@@ -151,7 +163,9 @@ export function DispatchModal({
       })
       .catch((err) => {
         if (cancelled) return
-        setError(err instanceof Error ? err.message : 'Falha ao carregar workflows.')
+        setError(
+          err instanceof Error ? err.message : 'Falha ao carregar workflows.',
+        )
       })
       .finally(() => {
         if (!cancelled) setLoadingMeta(false)
@@ -187,9 +201,13 @@ export function DispatchModal({
         if (cancelled) return
         setInputs(null)
         setValues({})
-        const msg = err instanceof Error ? err.message : 'Falha ao ler inputs do workflow.'
+        const msg =
+          err instanceof Error
+            ? err.message
+            : 'Falha ao ler inputs do workflow.'
         setError(
-          msg.includes('HTTP 404') || msg.toLowerCase().includes('não encontrado')
+          msg.includes('HTTP 404') ||
+            msg.toLowerCase().includes('não encontrado')
             ? `Arquivo do workflow não encontrado na ref “${yamlRef}”.`
             : msg,
         )
@@ -220,7 +238,11 @@ export function DispatchModal({
             ? `#${workflowId}`
             : '',
       },
-      { label: 'Workflow ID', value: workflowId != null ? String(workflowId) : '', mono: true },
+      {
+        label: 'Workflow ID',
+        value: workflowId != null ? String(workflowId) : '',
+        mono: true,
+      },
       { label: 'Branch / ref', value: ref.trim(), mono: true },
     ]
     for (const input of inputs ?? []) {
@@ -265,179 +287,223 @@ export function DispatchModal({
 
   return (
     <>
-    <div className="org-overlay" role="presentation" onClick={confirmOpen ? undefined : onClose}>
       <div
-        className="org-modal dispatch-modal"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="dispatch-title"
-        onClick={(e) => e.stopPropagation()}
+        className="org-overlay"
+        role="presentation"
+        onClick={confirmOpen ? undefined : onClose}
       >
-        <header className="org-header">
-          <div>
-            <h2 id="dispatch-title">Rodar workflow</h2>
-            <p className="org-subtitle">Dispara workflow_dispatch via API</p>
+        <div
+          className="org-modal dispatch-modal"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="dispatch-title"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <header className="org-header">
+            <div>
+              <h2 id="dispatch-title">Rodar workflow</h2>
+              <p className="org-subtitle">Dispara workflow_dispatch via API</p>
+            </div>
+            <button
+              type="button"
+              className="detail-close"
+              onClick={onClose}
+              aria-label="Fechar"
+            >
+              ×
+            </button>
+          </header>
+
+          <div className="dispatch-body">
+            {repos.length === 0 ? (
+              <p className="filters-backup-hint">
+                Selecione um repositório ou pasta com repos.
+              </p>
+            ) : (
+              <>
+                <label className="filter-field">
+                  <span>Repositório</span>
+                  <SearchableSelect
+                    options={repoOptions}
+                    value={repo}
+                    onChange={setRepo}
+                    disabled={busy}
+                    placeholder="Buscar repositório…"
+                    mono
+                  />
+                </label>
+
+                <label className="filter-field">
+                  <span>Workflow</span>
+                  <SearchableSelect
+                    options={workflowOptions}
+                    value={workflowId != null ? String(workflowId) : ''}
+                    onChange={(v) => setWorkflowId(v ? Number(v) : null)}
+                    disabled={busy || loadingMeta || workflows.length === 0}
+                    placeholder={
+                      loadingMeta
+                        ? 'Carregando…'
+                        : workflows.length === 0
+                          ? 'Nenhum workflow'
+                          : 'Buscar workflow…'
+                    }
+                    emptyLabel="Nenhum workflow"
+                  />
+                </label>
+
+                <label className="filter-field">
+                  <span>Branch / ref</span>
+                  <SearchableSelect
+                    options={branchOptions(branches, ref)}
+                    value={ref}
+                    onChange={setRef}
+                    disabled={busy || loadingMeta}
+                    placeholder={defaultBranch}
+                    allowCustom={branchesFailed || branches.length === 0}
+                    mono
+                    emptyLabel="Nenhuma branch"
+                  />
+                </label>
+
+                {branchesFailed && (
+                  <p className="filters-backup-hint">
+                    Não foi possível listar branches — digite a ref manualmente.
+                  </p>
+                )}
+
+                {loadingInputs && (
+                  <p className="filters-backup-hint">Lendo inputs do YAML…</p>
+                )}
+
+                {inputs && inputs.length > 0 && (
+                  <fieldset className="dispatch-inputs">
+                    <legend>Inputs</legend>
+                    {inputs.map((input) => (
+                      <label key={input.name} className="filter-field">
+                        <span>
+                          {input.name}
+                          {input.required ? ' *' : ''}
+                          {input.description ? (
+                            <span className="dispatch-input-desc">
+                              {' '}
+                              — {input.description}
+                            </span>
+                          ) : null}
+                        </span>
+                        {input.type === 'boolean' ? (
+                          <select
+                            value={values[input.name] ?? 'false'}
+                            onChange={(e) =>
+                              setValues((prev) => ({
+                                ...prev,
+                                [input.name]: e.target.value,
+                              }))
+                            }
+                            disabled={busy}
+                          >
+                            <option value="false">false</option>
+                            <option value="true">true</option>
+                          </select>
+                        ) : input.type === 'choice' &&
+                          input.options.length > 0 ? (
+                          <SearchableSelect
+                            options={input.options.map((opt) => ({
+                              value: opt,
+                              label: opt,
+                            }))}
+                            value={values[input.name] ?? ''}
+                            onChange={(v) =>
+                              setValues((prev) => ({
+                                ...prev,
+                                [input.name]: v,
+                              }))
+                            }
+                            disabled={busy}
+                            placeholder="Buscar…"
+                          />
+                        ) : isBranchLikeInput(input) ? (
+                          <SearchableSelect
+                            options={branchOptions(
+                              branches,
+                              values[input.name] ?? '',
+                            )}
+                            value={values[input.name] ?? ''}
+                            onChange={(v) =>
+                              setValues((prev) => ({
+                                ...prev,
+                                [input.name]: v,
+                              }))
+                            }
+                            disabled={busy}
+                            placeholder={defaultBranch}
+                            allowCustom={
+                              branchesFailed || branches.length === 0
+                            }
+                            mono
+                            emptyLabel="Nenhuma branch"
+                          />
+                        ) : (
+                          <input
+                            type={input.type === 'number' ? 'number' : 'text'}
+                            value={values[input.name] ?? ''}
+                            onChange={(e) =>
+                              setValues((prev) => ({
+                                ...prev,
+                                [input.name]: e.target.value,
+                              }))
+                            }
+                            disabled={busy}
+                          />
+                        )}
+                      </label>
+                    ))}
+                  </fieldset>
+                )}
+
+                {inputs && inputs.length === 0 && (
+                  <p className="filters-backup-hint">
+                    Sem inputs — o workflow será disparado na ref.
+                  </p>
+                )}
+              </>
+            )}
+
+            {error && <p className="filters-backup-error">{error}</p>}
           </div>
-          <button type="button" className="detail-close" onClick={onClose} aria-label="Fechar">
-            ×
-          </button>
-        </header>
 
-        <div className="dispatch-body">
-          {repos.length === 0 ? (
-            <p className="filters-backup-hint">Selecione um repositório ou pasta com repos.</p>
-          ) : (
-            <>
-              <label className="filter-field">
-                <span>Repositório</span>
-                <SearchableSelect
-                  options={repoOptions}
-                  value={repo}
-                  onChange={setRepo}
-                  disabled={busy}
-                  placeholder="Buscar repositório…"
-                  mono
-                />
-              </label>
-
-              <label className="filter-field">
-                <span>Workflow</span>
-                <SearchableSelect
-                  options={workflowOptions}
-                  value={workflowId != null ? String(workflowId) : ''}
-                  onChange={(v) => setWorkflowId(v ? Number(v) : null)}
-                  disabled={busy || loadingMeta || workflows.length === 0}
-                  placeholder={
-                    loadingMeta
-                      ? 'Carregando…'
-                      : workflows.length === 0
-                        ? 'Nenhum workflow'
-                        : 'Buscar workflow…'
-                  }
-                  emptyLabel="Nenhum workflow"
-                />
-              </label>
-
-              <label className="filter-field">
-                <span>Branch / ref</span>
-                <SearchableSelect
-                  options={branchOptions(branches, ref)}
-                  value={ref}
-                  onChange={setRef}
-                  disabled={busy || loadingMeta}
-                  placeholder={defaultBranch}
-                  allowCustom={branchesFailed || branches.length === 0}
-                  mono
-                  emptyLabel="Nenhuma branch"
-                />
-              </label>
-
-              {branchesFailed && (
-                <p className="filters-backup-hint">
-                  Não foi possível listar branches — digite a ref manualmente.
-                </p>
-              )}
-
-              {loadingInputs && <p className="filters-backup-hint">Lendo inputs do YAML…</p>}
-
-              {inputs && inputs.length > 0 && (
-                <fieldset className="dispatch-inputs">
-                  <legend>Inputs</legend>
-                  {inputs.map((input) => (
-                    <label key={input.name} className="filter-field">
-                      <span>
-                        {input.name}
-                        {input.required ? ' *' : ''}
-                        {input.description ? (
-                          <span className="dispatch-input-desc"> — {input.description}</span>
-                        ) : null}
-                      </span>
-                      {input.type === 'boolean' ? (
-                        <select
-                          value={values[input.name] ?? 'false'}
-                          onChange={(e) =>
-                            setValues((prev) => ({ ...prev, [input.name]: e.target.value }))
-                          }
-                          disabled={busy}
-                        >
-                          <option value="false">false</option>
-                          <option value="true">true</option>
-                        </select>
-                      ) : input.type === 'choice' && input.options.length > 0 ? (
-                        <SearchableSelect
-                          options={input.options.map((opt) => ({ value: opt, label: opt }))}
-                          value={values[input.name] ?? ''}
-                          onChange={(v) =>
-                            setValues((prev) => ({ ...prev, [input.name]: v }))
-                          }
-                          disabled={busy}
-                          placeholder="Buscar…"
-                        />
-                      ) : isBranchLikeInput(input) ? (
-                        <SearchableSelect
-                          options={branchOptions(branches, values[input.name] ?? '')}
-                          value={values[input.name] ?? ''}
-                          onChange={(v) =>
-                            setValues((prev) => ({ ...prev, [input.name]: v }))
-                          }
-                          disabled={busy}
-                          placeholder={defaultBranch}
-                          allowCustom={branchesFailed || branches.length === 0}
-                          mono
-                          emptyLabel="Nenhuma branch"
-                        />
-                      ) : (
-                        <input
-                          type={input.type === 'number' ? 'number' : 'text'}
-                          value={values[input.name] ?? ''}
-                          onChange={(e) =>
-                            setValues((prev) => ({ ...prev, [input.name]: e.target.value }))
-                          }
-                          disabled={busy}
-                        />
-                      )}
-                    </label>
-                  ))}
-                </fieldset>
-              )}
-
-              {inputs && inputs.length === 0 && (
-                <p className="filters-backup-hint">Sem inputs — o workflow será disparado na ref.</p>
-              )}
-            </>
-          )}
-
-          {error && <p className="filters-backup-error">{error}</p>}
+          <footer className="org-footer">
+            <button
+              type="button"
+              className="btn"
+              onClick={onClose}
+              disabled={busy}
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              className="btn btn-primary"
+              disabled={!canSubmit}
+              onClick={() => setConfirmOpen(true)}
+            >
+              Disparar
+            </button>
+          </footer>
         </div>
-
-        <footer className="org-footer">
-          <button type="button" className="btn" onClick={onClose} disabled={busy}>
-            Cancelar
-          </button>
-          <button
-            type="button"
-            className="btn btn-primary"
-            disabled={!canSubmit}
-            onClick={() => setConfirmOpen(true)}
-          >
-            Disparar
-          </button>
-        </footer>
       </div>
-    </div>
 
-    <ConfirmActionModal
-      open={confirmOpen}
-      title="Confirmar disparo"
-      subtitle="workflow_dispatch"
-      details={confirmDetails}
-      confirmLabel="Confirmar e disparar"
-      busy={busy}
-      onCancel={() => setConfirmOpen(false)}
-      onConfirm={() => {
-        void handleSubmit()
-      }}
-    />
+      <ConfirmActionModal
+        open={confirmOpen}
+        title="Confirmar disparo"
+        subtitle="workflow_dispatch"
+        details={confirmDetails}
+        confirmLabel="Confirmar e disparar"
+        busy={busy}
+        onCancel={() => setConfirmOpen(false)}
+        onConfirm={() => {
+          void handleSubmit()
+        }}
+      />
     </>
   )
 }

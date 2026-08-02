@@ -106,25 +106,37 @@ export function NotesList({
           />
           <span>Pins</span>
         </label>
-        <label className={`filter-chip${filters.unverifiedOnly ? ' is-on' : ''}`}>
+        <label
+          className={`filter-chip${filters.unverifiedOnly ? ' is-on' : ''}`}
+        >
           <input
             type="checkbox"
             checked={filters.unverifiedOnly}
-            onChange={(e) => onFiltersChange({ unverifiedOnly: e.target.checked })}
+            onChange={(e) =>
+              onFiltersChange({ unverifiedOnly: e.target.checked })
+            }
           />
           <span>Não verificadas</span>
         </label>
         {showExcludeGeneral && (
-          <label className={`filter-chip${filters.excludeGeneral ? ' is-on' : ''}`}>
+          <label
+            className={`filter-chip${filters.excludeGeneral ? ' is-on' : ''}`}
+          >
             <input
               type="checkbox"
               checked={filters.excludeGeneral}
-              onChange={(e) => onFiltersChange({ excludeGeneral: e.target.checked })}
+              onChange={(e) =>
+                onFiltersChange({ excludeGeneral: e.target.checked })
+              }
             />
             <span>Só do escopo</span>
           </label>
         )}
-        <button type="button" className="btn btn-primary notes-create-btn" onClick={onCreate}>
+        <button
+          type="button"
+          className="btn btn-primary notes-create-btn"
+          onClick={onCreate}
+        >
           Nova nota
         </button>
       </div>
@@ -148,7 +160,8 @@ export function NotesList({
             {showEmpty ? (
               <tr className="list-empty-row">
                 <td colSpan={7}>
-                  Nenhuma nota com os filtros atuais. Crie uma com <strong>Nova nota</strong>.
+                  Nenhuma nota com os filtros atuais. Crie uma com{' '}
+                  <strong>Nova nota</strong>.
                 </td>
               </tr>
             ) : (
@@ -163,7 +176,8 @@ export function NotesList({
                   note.link.type === 'repo' || note.link.type === 'branch'
                     ? note.link.repo
                     : ''
-                const branch = note.link.type === 'branch' ? note.link.branch : ''
+                const branch =
+                  note.link.type === 'branch' ? note.link.branch : ''
                 return (
                   <tr
                     key={note.id}
@@ -172,7 +186,9 @@ export function NotesList({
                   >
                     <td className="col-state">
                       <div className="note-type-cell">
-                        <span className={`badge badge-note-link-${note.link.type}`}>
+                        <span
+                          className={`badge badge-note-link-${note.link.type}`}
+                        >
                           {note.link.type === 'none'
                             ? 'geral'
                             : note.link.type === 'repo'
@@ -192,7 +208,11 @@ export function NotesList({
                     <td className="col-title">
                       <span className="pr-title-row">
                         {note.pinned && (
-                          <span className="note-pin-mark" title="Fixada" aria-label="Fixada">
+                          <span
+                            className="note-pin-mark"
+                            title="Fixada"
+                            aria-label="Fixada"
+                          >
                             ◆
                           </span>
                         )}
@@ -208,7 +228,11 @@ export function NotesList({
                     </td>
                     <td className="col-repo">
                       {repo ? (
-                        <CopyableCode value={repo} className="note-link-repo" title={repo} />
+                        <CopyableCode
+                          value={repo}
+                          className="note-link-repo"
+                          title={repo}
+                        />
                       ) : (
                         <span className="note-cell-empty">—</span>
                       )}

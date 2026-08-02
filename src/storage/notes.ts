@@ -7,14 +7,14 @@ import type { PrNotesMap } from '../domain/filters'
 
 const NOTES_KEY = 'pr-network-notes'
 
-export type { PrNotesMap }
 
 export function loadNotes(): PrNotesMap {
   try {
     const raw = localStorage.getItem(NOTES_KEY)
     if (!raw) return {}
     const parsed = JSON.parse(raw) as unknown
-    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {}
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed))
+      return {}
     const out: PrNotesMap = {}
     for (const [key, value] of Object.entries(parsed)) {
       if (typeof value === 'string' && value.trim()) {
@@ -31,12 +31,13 @@ export function saveNotes(notes: PrNotesMap): void {
   localStorage.setItem(NOTES_KEY, JSON.stringify(notes))
 }
 
-export function hasNote(notes: PrNotesMap, key: string): boolean {
-  return Boolean(notes[key]?.trim())
-}
 
 /** Retorna novo mapa; texto vazio remove a entrada. */
-export function setNote(notes: PrNotesMap, key: string, text: string): PrNotesMap {
+export function setNote(
+  notes: PrNotesMap,
+  key: string,
+  text: string,
+): PrNotesMap {
   const trimmed = text.trim()
   const next = { ...notes }
   if (trimmed) {
@@ -46,3 +47,7 @@ export function setNote(notes: PrNotesMap, key: string, text: string): PrNotesMa
   }
   return next
 }
+
+
+export { hasNote } from '../domain/filters'
+export type { PrNotesMap }

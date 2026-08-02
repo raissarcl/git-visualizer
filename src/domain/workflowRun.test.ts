@@ -75,56 +75,82 @@ describe('mergeWorkflowRunDetail', () => {
 
 describe('canCancel / canRerun / canRerunFailed', () => {
   it('allows cancel only while in progress', () => {
-    expect(canCancel(run({ id: 1, repo: 'a/b', status: 'in_progress', conclusion: null }))).toBe(
-      true,
-    )
-    expect(canCancel(run({ id: 1, repo: 'a/b', status: 'completed', conclusion: 'success' }))).toBe(
-      false,
-    )
+    expect(
+      canCancel(
+        run({ id: 1, repo: 'a/b', status: 'in_progress', conclusion: null }),
+      ),
+    ).toBe(true)
+    expect(
+      canCancel(
+        run({ id: 1, repo: 'a/b', status: 'completed', conclusion: 'success' }),
+      ),
+    ).toBe(false)
   })
 
   it('allows rerun when completed', () => {
-    expect(canRerun(run({ id: 1, repo: 'a/b', status: 'completed', conclusion: 'failure' }))).toBe(
-      true,
-    )
-    expect(canRerun(run({ id: 1, repo: 'a/b', status: 'queued', conclusion: null }))).toBe(false)
+    expect(
+      canRerun(
+        run({ id: 1, repo: 'a/b', status: 'completed', conclusion: 'failure' }),
+      ),
+    ).toBe(true)
+    expect(
+      canRerun(run({ id: 1, repo: 'a/b', status: 'queued', conclusion: null })),
+    ).toBe(false)
   })
 
   it('allows rerun failed only on failure-like conclusions', () => {
     expect(
-      canRerunFailed(run({ id: 1, repo: 'a/b', status: 'completed', conclusion: 'failure' })),
+      canRerunFailed(
+        run({ id: 1, repo: 'a/b', status: 'completed', conclusion: 'failure' }),
+      ),
     ).toBe(true)
     expect(
-      canRerunFailed(run({ id: 1, repo: 'a/b', status: 'completed', conclusion: 'success' })),
+      canRerunFailed(
+        run({ id: 1, repo: 'a/b', status: 'completed', conclusion: 'success' }),
+      ),
     ).toBe(false)
   })
 })
 
 describe('runBadgeKind', () => {
   it('maps status and conclusion', () => {
-    expect(runBadgeKind(run({ id: 1, repo: 'a/b', status: 'queued', conclusion: null }))).toBe(
-      'queued',
-    )
     expect(
-      runBadgeKind(run({ id: 1, repo: 'a/b', status: 'in_progress', conclusion: null })),
+      runBadgeKind(
+        run({ id: 1, repo: 'a/b', status: 'queued', conclusion: null }),
+      ),
+    ).toBe('queued')
+    expect(
+      runBadgeKind(
+        run({ id: 1, repo: 'a/b', status: 'in_progress', conclusion: null }),
+      ),
     ).toBe('in_progress')
     expect(
-      runBadgeKind(run({ id: 1, repo: 'a/b', status: 'completed', conclusion: 'success' })),
+      runBadgeKind(
+        run({ id: 1, repo: 'a/b', status: 'completed', conclusion: 'success' }),
+      ),
     ).toBe('success')
     expect(
-      runBadgeKind(run({ id: 1, repo: 'a/b', status: 'completed', conclusion: 'failure' })),
+      runBadgeKind(
+        run({ id: 1, repo: 'a/b', status: 'completed', conclusion: 'failure' }),
+      ),
     ).toBe('failure')
   })
 
   it('ignores stale conclusion while still queued/pending', () => {
     expect(
-      runBadgeKind(run({ id: 1, repo: 'a/b', status: 'queued', conclusion: 'success' })),
+      runBadgeKind(
+        run({ id: 1, repo: 'a/b', status: 'queued', conclusion: 'success' }),
+      ),
     ).toBe('queued')
     expect(
-      runBadgeKind(run({ id: 1, repo: 'a/b', status: 'pending', conclusion: 'success' })),
+      runBadgeKind(
+        run({ id: 1, repo: 'a/b', status: 'pending', conclusion: 'success' }),
+      ),
     ).toBe('queued')
     expect(
-      runBadgeKind(run({ id: 1, repo: 'a/b', status: 'requested', conclusion: 'failure' })),
+      runBadgeKind(
+        run({ id: 1, repo: 'a/b', status: 'requested', conclusion: 'failure' }),
+      ),
     ).toBe('queued')
   })
 })
@@ -132,13 +158,19 @@ describe('runBadgeKind', () => {
 describe('runBadgeLabel', () => {
   it('labels waiting distinctly from queued and in progress', () => {
     expect(
-      runBadgeLabel(run({ id: 1, repo: 'a/b', status: 'waiting', conclusion: null })),
+      runBadgeLabel(
+        run({ id: 1, repo: 'a/b', status: 'waiting', conclusion: null }),
+      ),
     ).toBe('aguardando')
     expect(
-      runBadgeLabel(run({ id: 1, repo: 'a/b', status: 'queued', conclusion: null })),
+      runBadgeLabel(
+        run({ id: 1, repo: 'a/b', status: 'queued', conclusion: null }),
+      ),
     ).toBe('na fila')
     expect(
-      runBadgeLabel(run({ id: 1, repo: 'a/b', status: 'in_progress', conclusion: null })),
+      runBadgeLabel(
+        run({ id: 1, repo: 'a/b', status: 'in_progress', conclusion: null }),
+      ),
     ).toBe('em andamento')
   })
 })
@@ -174,7 +206,11 @@ describe('filterWorkflowRuns', () => {
       filterWorkflowRuns(list, { query: '', status: 'failure', withinDays: 0 }),
     ).toHaveLength(1)
     expect(
-      filterWorkflowRuns(list, { query: '', status: 'in_progress', withinDays: 0 }),
+      filterWorkflowRuns(list, {
+        query: '',
+        status: 'in_progress',
+        withinDays: 0,
+      }),
     ).toHaveLength(1)
     expect(
       filterWorkflowRuns(list, { query: '', status: 'success', withinDays: 0 }),
@@ -186,7 +222,11 @@ describe('filterWorkflowRuns', () => {
       filterWorkflowRuns(list, { query: 'bob', status: 'all', withinDays: 0 }),
     ).toHaveLength(1)
     expect(
-      filterWorkflowRuns(list, { query: 'acme/a', status: 'all', withinDays: 0 }),
+      filterWorkflowRuns(list, {
+        query: 'acme/a',
+        status: 'all',
+        withinDays: 0,
+      }),
     ).toHaveLength(2)
   })
 
@@ -236,21 +276,39 @@ describe('isBranchLikeInput', () => {
     expect(
       isBranchLikeInput({ name: 'deploy_branch', type: 'string', options: [] }),
     ).toBe(true)
-    expect(isBranchLikeInput({ name: 'target-branch', type: 'string', options: [] })).toBe(true)
-    expect(isBranchLikeInput({ name: 'ref', type: 'string', options: [] })).toBe(true)
-    expect(isBranchLikeInput({ name: 'git_ref', type: 'environment', options: [] })).toBe(true)
+    expect(
+      isBranchLikeInput({ name: 'target-branch', type: 'string', options: [] }),
+    ).toBe(true)
+    expect(
+      isBranchLikeInput({ name: 'ref', type: 'string', options: [] }),
+    ).toBe(true)
+    expect(
+      isBranchLikeInput({ name: 'git_ref', type: 'environment', options: [] }),
+    ).toBe(true)
   })
 
   it('ignores boolean, number, and choice with options', () => {
-    expect(isBranchLikeInput({ name: 'branch', type: 'boolean', options: [] })).toBe(false)
-    expect(isBranchLikeInput({ name: 'branch', type: 'number', options: [] })).toBe(false)
     expect(
-      isBranchLikeInput({ name: 'branch', type: 'choice', options: ['a', 'b'] }),
+      isBranchLikeInput({ name: 'branch', type: 'boolean', options: [] }),
+    ).toBe(false)
+    expect(
+      isBranchLikeInput({ name: 'branch', type: 'number', options: [] }),
+    ).toBe(false)
+    expect(
+      isBranchLikeInput({
+        name: 'branch',
+        type: 'choice',
+        options: ['a', 'b'],
+      }),
     ).toBe(false)
   })
 
   it('ignores unrelated string inputs', () => {
-    expect(isBranchLikeInput({ name: 'environment', type: 'string', options: [] })).toBe(false)
-    expect(isBranchLikeInput({ name: 'note', type: 'string', options: [] })).toBe(false)
+    expect(
+      isBranchLikeInput({ name: 'environment', type: 'string', options: [] }),
+    ).toBe(false)
+    expect(
+      isBranchLikeInput({ name: 'note', type: 'string', options: [] }),
+    ).toBe(false)
   })
 })

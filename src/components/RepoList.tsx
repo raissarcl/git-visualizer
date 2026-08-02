@@ -136,7 +136,9 @@ export function RepoList({
             onClick={() => onSelectScope({ type: 'network' })}
           >
             <span className="repo-item-name">Sua rede</span>
-            <span className="repo-item-count">{networkActive ? loadedCount : '—'}</span>
+            <span className="repo-item-count">
+              {networkActive ? loadedCount : '—'}
+            </span>
           </button>
         </li>
 

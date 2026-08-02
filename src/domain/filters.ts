@@ -30,19 +30,32 @@ function openAgeDays(pr: PullRequest, now: number): number {
 }
 
 /** true se `iso` está dentro dos últimos `withinDays` dias (1 = 24h). */
-export function isWithinDays(iso: string, withinDays: PeriodFilterDays, now = Date.now()): boolean {
+export function isWithinDays(
+  iso: string,
+  withinDays: PeriodFilterDays,
+  now = Date.now(),
+): boolean {
   if (withinDays <= 0) return true
   const t = new Date(iso).getTime()
   if (Number.isNaN(t)) return false
   return now - t <= withinDays * 24 * 60 * 60 * 1000
 }
 
-function hasNoteText(notes: PrNotesMap, key: string): boolean {
+/** true se existe texto não-vazio para a chave. */
+export function hasNote(notes: PrNotesMap, key: string): boolean {
   return Boolean(notes[key]?.trim())
 }
 
+/** true se a chave está no conjunto de pins. */
+export function isPinned(pins: PinSet, key: string): boolean {
+  return pins.has(key)
+}
+
 /** Busca textual local — estado/repo/mineOnly vão para a API. */
-export function filterByQuery(prs: PullRequest[], query: string): PullRequest[] {
+export function filterByQuery(
+  prs: PullRequest[],
+  query: string,
+): PullRequest[] {
   const q = query.trim().toLowerCase()
   if (!q) return prs
 
@@ -70,7 +83,7 @@ export function filterPullRequests(
   let result = filterByQuery(prs, filters.query)
 
   if (filters.notesOnly) {
-    result = result.filter((pr) => hasNoteText(notes, prKey(pr.repo, pr.number)))
+    result = result.filter((pr) => hasNote(notes, prKey(pr.repo, pr.number)))
   }
 
   if (filters.conflictOnly) {
@@ -79,18 +92,25 @@ export function filterPullRequests(
 
   if (filters.minOpenDays > 0) {
     const min = filters.minOpenDays
-    result = result.filter((pr) => pr.state === 'OPEN' && openAgeDays(pr, now) >= min)
+    result = result.filter(
+      (pr) => pr.state === 'OPEN' && openAgeDays(pr, now) >= min,
+    )
   }
 
   if (filters.withinDays > 0) {
-    result = result.filter((pr) => isWithinDays(pr.updatedAt, filters.withinDays, now))
+    result = result.filter((pr) =>
+      isWithinDays(pr.updatedAt, filters.withinDays, now),
+    )
   }
 
   return result
 }
 
 /** Fixados primeiro; ordem relativa dentro de cada grupo preservada. */
-export function sortPinnedFirst(prs: PullRequest[], pins: PinSet): PullRequest[] {
+export function sortPinnedFirst(
+  prs: PullRequest[],
+  pins: PinSet,
+): PullRequest[] {
   if (pins.size === 0) return prs
   const pinned: PullRequest[] = []
   const rest: PullRequest[] = []

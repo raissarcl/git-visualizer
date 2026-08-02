@@ -69,7 +69,8 @@ export interface WorkflowSummary {
   htmlUrl: string
 }
 
-export type WorkflowInputType = 'string' | 'boolean' | 'choice' | 'environment' | 'number'
+export type WorkflowInputType =
+  'string' | 'boolean' | 'choice' | 'environment' | 'number'
 
 export interface WorkflowInput {
   name: string
@@ -100,7 +101,10 @@ export function mergeWorkflowRunDetail(
   fromList: WorkflowRun,
   previous: WorkflowRun | null | undefined,
 ): WorkflowRun {
-  if (!previous || runKey(previous.repo, previous.id) !== runKey(fromList.repo, fromList.id)) {
+  if (
+    !previous ||
+    runKey(previous.repo, previous.id) !== runKey(fromList.repo, fromList.id)
+  ) {
     return fromList
   }
   const listHasInputs = Object.keys(fromList.inputs).length > 0
@@ -139,7 +143,9 @@ export function canRerun(run: Pick<WorkflowRun, 'status'>): boolean {
   return run.status === 'completed'
 }
 
-export function canRerunFailed(run: Pick<WorkflowRun, 'status' | 'conclusion'>): boolean {
+export function canRerunFailed(
+  run: Pick<WorkflowRun, 'status' | 'conclusion'>,
+): boolean {
   return (
     run.status === 'completed' &&
     (run.conclusion === 'failure' ||
@@ -184,7 +190,9 @@ export function runBadgeKind(
   return 'neutral'
 }
 
-export function runBadgeLabel(run: Pick<WorkflowRun, 'status' | 'conclusion'>): string {
+export function runBadgeLabel(
+  run: Pick<WorkflowRun, 'status' | 'conclusion'>,
+): string {
   if (run.status === 'waiting') return 'aguardando'
   const kind = runBadgeKind(run)
   if (kind === 'in_progress') return 'em andamento'
@@ -195,10 +203,14 @@ export function runBadgeLabel(run: Pick<WorkflowRun, 'status' | 'conclusion'>): 
   return run.conclusion ?? run.status
 }
 
-function matchesStatusFilter(run: WorkflowRun, status: ActionsStatusFilter): boolean {
+function matchesStatusFilter(
+  run: WorkflowRun,
+  status: ActionsStatusFilter,
+): boolean {
   if (status === 'all') return true
   if (status === 'in_progress') return isRunInProgress(run)
-  if (status === 'success') return run.status === 'completed' && run.conclusion === 'success'
+  if (status === 'success')
+    return run.status === 'completed' && run.conclusion === 'success'
   if (status === 'failure') return canRerunFailed(run)
   return true
 }
@@ -225,12 +237,16 @@ export function filterWorkflowRuns(
   }
 
   if (filters.withinDays > 0) {
-    result = result.filter((run) => isWithinDays(run.createdAt, filters.withinDays, now))
+    result = result.filter((run) =>
+      isWithinDays(run.createdAt, filters.withinDays, now),
+    )
   }
 
   if (filters.notesOnly && filters.notes) {
     const notes = filters.notes
-    result = result.filter((run) => Boolean(notes[actionNoteKey(run.repo, run.id)]?.trim()))
+    result = result.filter((run) =>
+      Boolean(notes[actionNoteKey(run.repo, run.id)]?.trim()),
+    )
   }
 
   return result
@@ -261,7 +277,9 @@ function normalizeInputName(name: string): string {
  * Inputs string/environment cujo nome sugere branch/ref/deploy → seletor de branches.
  * Choice com options do YAML e boolean ficam como estão.
  */
-export function isBranchLikeInput(input: Pick<WorkflowInput, 'name' | 'type' | 'options'>): boolean {
+export function isBranchLikeInput(
+  input: Pick<WorkflowInput, 'name' | 'type' | 'options'>,
+): boolean {
   if (input.type === 'boolean' || input.type === 'number') return false
   if (input.type === 'choice' && input.options.length > 0) return false
 

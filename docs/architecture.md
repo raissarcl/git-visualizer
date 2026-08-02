@@ -4,16 +4,18 @@ App SPA sem backend. O browser fala direto com a GitHub GraphQL API (PRs) e a RE
 
 ## Camadas
 
-| Pasta | Responsabilidade |
-|-------|------------------|
-| `domain/` | Tipos (`PullRequest`, `WorkflowRun`, `WorkspaceNote`, …) e regras puras (filtros, `prKey`, badges de run). Sem React, sem I/O. |
-| `github/` | Adaptador remoto: cliente GraphQL, cliente REST, queries, Actions, branches, mappers, search/repos, PAT, parse de YAML de workflow. |
-| `storage/` | Persistência local: notes (PR/Action), workspace notes, pins, layout de repos, backup, preferências UI. |
-| `hooks/` | Orquestra estado React e chama `github` / `storage` / `domain`. |
-| `components/` | UI apresentacional (recebe props). |
-| `App.tsx` | Compõe hooks + layout shell (abas PRs / Actions / Notas). |
+| Pasta         | Responsabilidade                                                                                                                                     |
+| ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `domain/`     | Tipos (`PullRequest`, `WorkflowRun`, `WorkspaceNote`, …) e regras puras (filtros, `prKey`, `hasNote`/`isPinned`, badges de run). Sem React, sem I/O. |
+| `github/`     | Adaptador remoto: cliente GraphQL, cliente REST, queries, Actions, branches, mappers, search/repos, PAT, parse de YAML de workflow.                  |
+| `storage/`    | Persistência local: notes (PR/Action), workspace notes, pins, layout de repos (`reposForScope`), backup, preferências UI.                            |
+| `hooks/`      | Orquestra estado React e chama `github` / `storage` / `domain`. Branch lookup de notas via `useLocalWorkspace`.                                      |
+| `components/` | UI apresentacional (recebe props). Preferir `domain` para helpers puros; `storage` só para tipos/layout da sidebar.                                  |
+| `App.tsx`     | Compõe hooks + layout shell (abas PRs / Actions / Notas). Não chama `github` direto.                                                                 |
 
 Dependências permitidas: UI → hooks/domain/storage; hooks → github/storage/domain; github/storage → domain. **Não** o contrário.
+
+Ferramentas de qualidade: `oxlint` (`npm run lint`), Prettier (`npm run format` / `format:check`), Vitest, e gate local `npm run check`.
 
 ```mermaid
 flowchart TB
@@ -46,15 +48,15 @@ Escopo Notas: `rede` = todas; `repo`/`pasta` = notas daqueles repos + gerais (ch
 
 ## Chaves `localStorage`
 
-| Chave | Conteúdo |
-|-------|----------|
-| `gh_pat` | Personal Access Token (nunca no backup) |
-| `pr-network-notes` | Mapa de anotações de PR/Action `{ "owner/repo#n" \| "run:owner/repo#id": "texto" }` |
-| `pr-network-workspace-notes` | Array de `WorkspaceNote` (aba Notas) |
-| `pr-network-pins` | Array de keys `"owner/repo#n"` (PRs) |
-| `gh_repo_layout` | Pastas (`parentId` para subpastas), `foldersByRepo`, `hidden` |
-| `pr-network-sidebar-collapsed` | `"1"` / `"0"` |
-| `pr-network-theme` | `"dark"` \| `"light"` (fora do backup) |
+| Chave                          | Conteúdo                                                                            |
+| ------------------------------ | ----------------------------------------------------------------------------------- |
+| `gh_pat`                       | Personal Access Token (nunca no backup)                                             |
+| `pr-network-notes`             | Mapa de anotações de PR/Action `{ "owner/repo#n" \| "run:owner/repo#id": "texto" }` |
+| `pr-network-workspace-notes`   | Array de `WorkspaceNote` (aba Notas)                                                |
+| `pr-network-pins`              | Array de keys `"owner/repo#n"` (PRs)                                                |
+| `gh_repo_layout`               | Pastas (`parentId` para subpastas), `foldersByRepo`, `hidden`                       |
+| `pr-network-sidebar-collapsed` | `"1"` / `"0"`                                                                       |
+| `pr-network-theme`             | `"dark"` \| `"light"` (fora do backup)                                              |
 
 Layouts antigos com `folderByRepo` (um repo → uma pasta) são migrados na carga para `foldersByRepo`.
 

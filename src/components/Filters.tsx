@@ -82,7 +82,11 @@ export function Filters({
               />
             </label>
 
-            <div className="filter-chips" role="group" aria-label="Filtros rápidos">
+            <div
+              className="filter-chips"
+              role="group"
+              aria-label="Filtros rápidos"
+            >
               <label className={`filter-chip${mineOnly ? ' is-on' : ''}`}>
                 <input
                   type="checkbox"
@@ -118,7 +122,9 @@ export function Filters({
           <details className="filters-details">
             <summary>
               Mais filtros
-              {advancedActive && <span className="filters-details-dot" aria-hidden="true" />}
+              {advancedActive && (
+                <span className="filters-details-dot" aria-hidden="true" />
+              )}
             </summary>
             <div className="filters-details-body filters-grid">
               <label className="filter-field">
@@ -138,7 +144,9 @@ export function Filters({
                 <span>Abertos &gt;</span>
                 <select
                   value={String(minOpenDays)}
-                  onChange={(e) => onMinOpenDaysChange(Number(e.target.value) as AgeFilterDays)}
+                  onChange={(e) =>
+                    onMinOpenDaysChange(Number(e.target.value) as AgeFilterDays)
+                  }
                 >
                   <option value="0">—</option>
                   <option value="3">3d</option>
@@ -153,7 +161,9 @@ export function Filters({
                 <select
                   value={String(withinDays)}
                   onChange={(e) =>
-                    onWithinDaysChange(Number(e.target.value) as PeriodFilterDays)
+                    onWithinDaysChange(
+                      Number(e.target.value) as PeriodFilterDays,
+                    )
                   }
                 >
                   <option value="0">Todos</option>
@@ -170,7 +180,9 @@ export function Filters({
       <details className="filters-details">
         <summary>Backup local</summary>
         <div className="filters-details-body">
-          <p className="filters-backup-hint">Notas, pins, pastas e notas de workspace · sem token</p>
+          <p className="filters-backup-hint">
+            Notas, pins, pastas e notas de workspace · sem token
+          </p>
           <div className="filters-backup-actions">
             <button type="button" className="btn-backup" onClick={onExport}>
               Exportar
@@ -205,16 +217,24 @@ export function Filters({
                   .catch((err) => {
                     setImportOk(false)
                     setClearedOk(false)
-                    setImportError(err instanceof Error ? err.message : 'Falha ao importar.')
+                    setImportError(
+                      err instanceof Error ? err.message : 'Falha ao importar.',
+                    )
                   })
               }}
             />
           </div>
-          <button type="button" className="btn-backup btn-backup-danger" onClick={handleClear}>
+          <button
+            type="button"
+            className="btn-backup btn-backup-danger"
+            onClick={handleClear}
+          >
             Limpar dados locais
           </button>
           {importOk && <p className="filters-backup-ok">Backup importado.</p>}
-          {clearedOk && <p className="filters-backup-ok">Dados locais limpos.</p>}
+          {clearedOk && (
+            <p className="filters-backup-ok">Dados locais limpos.</p>
+          )}
           {importError && <p className="filters-backup-error">{importError}</p>}
         </div>
       </details>

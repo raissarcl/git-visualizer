@@ -3,7 +3,11 @@
  * Nunca sincroniza com o GitHub.
  */
 
-import type { NoteLink, NoteRemoteStatus, WorkspaceNote } from '../domain/workspaceNote'
+import type {
+  NoteLink,
+  NoteRemoteStatus,
+  WorkspaceNote,
+} from '../domain/workspaceNote'
 import { normalizeTags } from '../domain/workspaceNote'
 
 const WORKSPACE_NOTES_KEY = 'pr-network-workspace-notes'
@@ -42,12 +46,11 @@ function parseLink(raw: unknown): NoteLink {
   return { type: 'none' }
 }
 
-function parseLinkedPr(
-  raw: unknown,
-): { repo: string; number: number } | null {
+function parseLinkedPr(raw: unknown): { repo: string; number: number } | null {
   if (!isRecord(raw)) return null
   if (typeof raw.repo !== 'string' || !raw.repo.trim()) return null
-  if (typeof raw.number !== 'number' || !Number.isFinite(raw.number)) return null
+  if (typeof raw.number !== 'number' || !Number.isFinite(raw.number))
+    return null
   return { repo: raw.repo.trim(), number: raw.number }
 }
 
@@ -67,7 +70,9 @@ function parseOne(raw: unknown): WorkspaceNote | null {
       ? raw.createdAt
       : new Date().toISOString()
   const updatedAt =
-    typeof raw.updatedAt === 'string' && raw.updatedAt ? raw.updatedAt : createdAt
+    typeof raw.updatedAt === 'string' && raw.updatedAt
+      ? raw.updatedAt
+      : createdAt
 
   return {
     id: raw.id.trim(),
@@ -121,6 +126,9 @@ export function upsertWorkspaceNote(
   return next
 }
 
-export function removeWorkspaceNote(notes: WorkspaceNote[], id: string): WorkspaceNote[] {
+export function removeWorkspaceNote(
+  notes: WorkspaceNote[],
+  id: string,
+): WorkspaceNote[] {
   return notes.filter((n) => n.id !== id)
 }

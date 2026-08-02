@@ -48,7 +48,9 @@ export type NotesScopeFilter =
   | { type: 'network' }
   | { type: 'repos'; repos: string[]; excludeGeneral: boolean }
 
-export function createWorkspaceNote(partial?: Partial<WorkspaceNote>): WorkspaceNote {
+export function createWorkspaceNote(
+  partial?: Partial<WorkspaceNote>,
+): WorkspaceNote {
   const now = new Date().toISOString()
   return {
     id: partial?.id ?? crypto.randomUUID(),
@@ -109,7 +111,11 @@ export function filterWorkspaceNotes(
 
   const scoped: NotesScopeFilter =
     scope.type === 'repos'
-      ? { type: 'repos', repos: scope.repos, excludeGeneral: filters.excludeGeneral }
+      ? {
+          type: 'repos',
+          repos: scope.repos,
+          excludeGeneral: filters.excludeGeneral,
+        }
       : scope
 
   let result = notes.filter((note) => matchesScope(note, scoped))
@@ -161,9 +167,7 @@ export function findMatchingPr(
   const { repo, branch } = note.link
   const hit = prs.find(
     (pr) =>
-      pr.repo === repo &&
-      pr.headRefName === branch &&
-      pr.state === 'OPEN',
+      pr.repo === repo && pr.headRefName === branch && pr.state === 'OPEN',
   )
   return hit ? { repo: hit.repo, number: hit.number } : null
 }
@@ -183,7 +187,10 @@ export function normalizeTags(raw: string[]): string[] {
 }
 
 /** Texto plano do body para preview (markdown leve). */
-export function noteBodyPreview(note: Pick<WorkspaceNote, 'body'>, maxLen = 80): string {
+export function noteBodyPreview(
+  note: Pick<WorkspaceNote, 'body'>,
+  maxLen = 80,
+): string {
   const flat = note.body
     .replace(/^#{1,6}\s+/gm, '')
     .replace(/[*_`~]+/g, '')
@@ -195,7 +202,9 @@ export function noteBodyPreview(note: Pick<WorkspaceNote, 'body'>, maxLen = 80):
 }
 
 /** Título na lista: title, senão trecho do body, senão placeholder. */
-export function noteListTitle(note: Pick<WorkspaceNote, 'title' | 'body'>): string {
+export function noteListTitle(
+  note: Pick<WorkspaceNote, 'title' | 'body'>,
+): string {
   const title = note.title.trim()
   if (title) return title
   const preview = noteBodyPreview(note, 80)
@@ -203,7 +212,10 @@ export function noteListTitle(note: Pick<WorkspaceNote, 'title' | 'body'>): stri
 }
 
 /** Compara conteúdo editável (ignora updatedAt). */
-export function workspaceNotesContentEqual(a: WorkspaceNote, b: WorkspaceNote): boolean {
+export function workspaceNotesContentEqual(
+  a: WorkspaceNote,
+  b: WorkspaceNote,
+): boolean {
   return (
     a.id === b.id &&
     a.title === b.title &&

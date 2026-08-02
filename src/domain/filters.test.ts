@@ -17,7 +17,9 @@ const baseLocal: LocalFilters = {
   withinDays: 0,
 }
 
-function pr(partial: Partial<PullRequest> & Pick<PullRequest, 'number' | 'repo'>): PullRequest {
+function pr(
+  partial: Partial<PullRequest> & Pick<PullRequest, 'number' | 'repo'>,
+): PullRequest {
   return {
     id: partial.id ?? `id-${partial.repo}-${partial.number}`,
     title: partial.title ?? 'Title',
@@ -137,6 +139,8 @@ describe('sortPinnedFirst', () => {
     const b = pr({ repo: 'r', number: 2, title: 'b' })
     const c = pr({ repo: 'r', number: 3, title: 'c' })
     const pins = new Set([prKey('r', 3), prKey('r', 1)])
-    expect(sortPinnedFirst([a, b, c], pins).map((p) => p.number)).toEqual([1, 3, 2])
+    expect(sortPinnedFirst([a, b, c], pins).map((p) => p.number)).toEqual([
+      1, 3, 2,
+    ])
   })
 })

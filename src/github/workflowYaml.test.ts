@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { parseWorkflowDispatchDetailed, parseWorkflowDispatchInputs } from './workflowYaml'
+import {
+  parseWorkflowDispatchDetailed,
+  parseWorkflowDispatchInputs,
+} from './workflowYaml'
 
 describe('parseWorkflowDispatchInputs', () => {
   it('returns null when workflow_dispatch is absent', () => {
@@ -82,7 +85,9 @@ on:
 `
     const detailed = parseWorkflowDispatchDetailed(yaml)
     expect(detailed.inputs).toBeNull()
-    expect(detailed.onKeys).toEqual(expect.arrayContaining(['push', 'pull_request']))
+    expect(detailed.onKeys).toEqual(
+      expect.arrayContaining(['push', 'pull_request']),
+    )
     expect(detailed.rawMentionsDispatch).toBe(false)
   })
 

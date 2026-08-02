@@ -9,7 +9,11 @@ import type {
   WorkflowRun,
   WorkflowSummary,
 } from '../domain/workflowRun'
-import { isRunInProgress, mergeWorkflowRunDetail, runKey } from '../domain/workflowRun'
+import {
+  isRunInProgress,
+  mergeWorkflowRunDetail,
+  runKey,
+} from '../domain/workflowRun'
 import {
   cancelWorkflowRun,
   dispatchWorkflow,
@@ -31,6 +35,8 @@ import {
 } from '../storage/repoLayout'
 
 const POLL_MS = 15_000
+/** GitHub workflow_dispatch is eventually consistent — burst-reload until the run shows up. */
+const POST_DISPATCH_REFRESH_MS = [1_000, 3_000, 8_000] as const
 
 export function useActions(options: {
   token: string
@@ -51,9 +57,17 @@ export function useActions(options: {
   const [jobsLoading, setJobsLoading] = useState(false)
 
   const pollRef = useRef<number | null>(null)
+  const burstTimersRef = useRef<number[]>([])
   const selectedKeyRef = useRef<string | null>(null)
   const loadArgsRef = useRef({ token, scope, layout, viewerRepos })
   const hasInProgress = runs.some(isRunInProgress)
+
+  const clearBurstRefresh = useCallback(() => {
+    for (const id of burstTimersRef.current) {
+      window.clearTimeout(id)
+    }
+    burstTimersRef.current = []
+  }, [])
 
   useEffect(() => {
     selectedKeyRef.current = selectedRun
@@ -65,24 +79,36 @@ export function useActions(options: {
     loadArgsRef.current = { token, scope, layout, viewerRepos }
   }, [token, scope, layout, viewerRepos])
 
-  const refreshSelectedJobs = useCallback(async (pat: string, repo: string, runId: number) => {
-    setJobsLoading(true)
-    try {
-      const list = await fetchWorkflowRunJobs(pat, repo, runId)
-      if (selectedKeyRef.current === runKey(repo, runId)) {
-        setJobs(list)
+  const refreshSelectedJobs = useCallback(
+    async (pat: string, repo: string, runId: number) => {
+      setJobsLoading(true)
+      try {
+        const list = await fetchWorkflowRunJobs(pat, repo, runId)
+        if (selectedKeyRef.current === runKey(repo, runId)) {
+          setJobs(list)
+        }
+      } catch {
+        if (selectedKeyRef.current === runKey(repo, runId)) {
+          setJobs([])
+        }
+      } finally {
+        setJobsLoading(false)
       }
-    } catch {
-      if (selectedKeyRef.current === runKey(repo, runId)) {
-        setJobs([])
-      }
-    } finally {
-      setJobsLoading(false)
-    }
-  }, [])
+    },
+    [],
+  )
 
   const loadRuns = useCallback(
-    async (pat: string, opts: { scope: SidebarScope; layout: RepoLayout; allRepos: string[] }) => {
+    async (
+      pat: string,
+      opts: {
+        scope: SidebarScope
+        layout: RepoLayout
+        allRepos: string[]
+        /** Skip full-list loading spinner (post-dispatch burst / poll). */
+        quiet?: boolean
+      },
+    ) => {
       if (!pat) {
         setError('Salve um Personal Access Token para carregar Actions.')
         setRuns([])
@@ -97,14 +123,18 @@ export function useActions(options: {
         return
       }
 
-      setLoading(true)
+      if (!opts.quiet) setLoading(true)
       setError(null)
 
       try {
         let nextRuns: WorkflowRun[] = []
 
         if (opts.scope.type === 'folder') {
-          const folderRepos = reposInFolder(opts.layout, opts.scope.id, opts.allRepos)
+          const folderRepos = reposInFolder(
+            opts.layout,
+            opts.scope.id,
+            opts.allRepos,
+          )
           if (folderRepos.length === 0) {
             setRuns([])
             setSelectedRun(null)
@@ -112,7 +142,10 @@ export function useActions(options: {
             return
           }
 
-          const result: FolderRunsResult = await fetchFolderWorkflowRuns(pat, folderRepos)
+          const result: FolderRunsResult = await fetchFolderWorkflowRuns(
+            pat,
+            folderRepos,
+          )
           if (result.fatalError) {
             setRuns([])
             setError(result.fatalError)
@@ -132,8 +165,12 @@ export function useActions(options: {
         }
 
         setRuns((prevRuns) => {
-          const prevByKey = new Map(prevRuns.map((r) => [runKey(r.repo, r.id), r]))
-          return nextRuns.map((r) => mergeWorkflowRunDetail(r, prevByKey.get(runKey(r.repo, r.id))))
+          const prevByKey = new Map(
+            prevRuns.map((r) => [runKey(r.repo, r.id), r]),
+          )
+          return nextRuns.map((r) =>
+            mergeWorkflowRunDetail(r, prevByKey.get(runKey(r.repo, r.id))),
+          )
         })
         setSelectedRun((prev) => {
           if (!prev) return null
@@ -143,15 +180,49 @@ export function useActions(options: {
         })
       } catch (err) {
         setRuns([])
-        setError(err instanceof Error ? err.message : 'Falha ao buscar Actions.')
+        setError(
+          err instanceof Error ? err.message : 'Falha ao buscar Actions.',
+        )
         setSelectedRun(null)
         setJobs([])
       } finally {
-        setLoading(false)
+        if (!opts.quiet) setLoading(false)
       }
     },
     [],
   )
+
+  const reloadFromLatestArgs = useCallback(
+    async (quiet: boolean) => {
+      const args = loadArgsRef.current
+      if (!args.token || args.scope.type === 'network') return
+      await loadRuns(args.token, {
+        scope: args.scope,
+        layout: args.layout,
+        allRepos: args.viewerRepos,
+        quiet,
+      })
+      const key = selectedKeyRef.current
+      if (!key || !args.token) return
+      const hash = key.lastIndexOf('#')
+      const repo = key.slice(0, hash)
+      const id = Number(key.slice(hash + 1))
+      if (!repo || !Number.isFinite(id)) return
+      await refreshSelectedJobs(args.token, repo, id)
+    },
+    [loadRuns, refreshSelectedJobs],
+  )
+
+  /** After workflow_dispatch, GitHub may take a few seconds to list the new run. */
+  const schedulePostDispatchRefresh = useCallback(() => {
+    clearBurstRefresh()
+    for (const delayMs of POST_DISPATCH_REFRESH_MS) {
+      const timerId = window.setTimeout(() => {
+        void reloadFromLatestArgs(true)
+      }, delayMs)
+      burstTimersRef.current.push(timerId)
+    }
+  }, [clearBurstRefresh, reloadFromLatestArgs])
 
   const applyRunDetail = useCallback((detailed: WorkflowRun) => {
     const key = runKey(detailed.repo, detailed.id)
@@ -182,17 +253,18 @@ export function useActions(options: {
   )
 
   /** Recarrega o run selecionado (inputs/branch) antes de confirmar mutação. */
-  const ensureSelectedRunDetail = useCallback(async (): Promise<WorkflowRun | null> => {
-    const current = selectedRun
-    if (!current || !token) return current
-    try {
-      const detailed = await fetchWorkflowRun(token, current.repo, current.id)
-      applyRunDetail(detailed)
-      return detailed
-    } catch {
-      return current
-    }
-  }, [selectedRun, token, applyRunDetail])
+  const ensureSelectedRunDetail =
+    useCallback(async (): Promise<WorkflowRun | null> => {
+      const current = selectedRun
+      if (!current || !token) return current
+      try {
+        const detailed = await fetchWorkflowRun(token, current.repo, current.id)
+        applyRunDetail(detailed)
+        return detailed
+      } catch {
+        return current
+      }
+    }, [selectedRun, token, applyRunDetail])
 
   useEffect(() => {
     if (!active || !token) return
@@ -215,21 +287,7 @@ export function useActions(options: {
     if (!active || !hasInProgress) return
 
     pollRef.current = window.setInterval(() => {
-      const args = loadArgsRef.current
-      if (!args.token || args.scope.type === 'network') return
-      void loadRuns(args.token, {
-        scope: args.scope,
-        layout: args.layout,
-        allRepos: args.viewerRepos,
-      }).then(() => {
-        const key = selectedKeyRef.current
-        if (!key || !args.token) return
-        const hash = key.lastIndexOf('#')
-        const repo = key.slice(0, hash)
-        const id = Number(key.slice(hash + 1))
-        if (!repo || !Number.isFinite(id)) return
-        void refreshSelectedJobs(args.token, repo, id)
-      })
+      void reloadFromLatestArgs(true)
     }, POLL_MS)
 
     return () => {
@@ -238,14 +296,32 @@ export function useActions(options: {
         pollRef.current = null
       }
     }
-  }, [active, hasInProgress, loadRuns, refreshSelectedJobs])
+  }, [active, hasInProgress, reloadFromLatestArgs])
+
+  // Drop pending post-dispatch bursts when leaving Actions / changing scope / unmounting.
+  useEffect(() => {
+    if (!active) clearBurstRefresh()
+    return () => {
+      clearBurstRefresh()
+    }
+  }, [active, scope, clearBurstRefresh])
 
   const refresh = useCallback(() => {
     if (!token || !active) return
     void loadRuns(token, { scope, layout, allRepos: viewerRepos }).then(() => {
-      if (selectedRun) void refreshSelectedJobs(token, selectedRun.repo, selectedRun.id)
+      if (selectedRun)
+        void refreshSelectedJobs(token, selectedRun.repo, selectedRun.id)
     })
-  }, [token, active, scope, layout, viewerRepos, loadRuns, selectedRun, refreshSelectedJobs])
+  }, [
+    token,
+    active,
+    scope,
+    layout,
+    viewerRepos,
+    loadRuns,
+    selectedRun,
+    refreshSelectedJobs,
+  ])
 
   const resetOnEmptyToken = useCallback(() => {
     setRuns([])
@@ -284,12 +360,15 @@ export function useActions(options: {
 
   const cancelRun = useCallback(
     (run: WorkflowRun) =>
-      withMutation('cancelar', () => cancelWorkflowRun(token, run.repo, run.id)),
+      withMutation('cancelar', () =>
+        cancelWorkflowRun(token, run.repo, run.id),
+      ),
     [token, withMutation],
   )
 
   const rerun = useCallback(
-    (run: WorkflowRun) => withMutation('reexecutar', () => rerunWorkflow(token, run.repo, run.id)),
+    (run: WorkflowRun) =>
+      withMutation('reexecutar', () => rerunWorkflow(token, run.repo, run.id)),
     [token, withMutation],
   )
 
@@ -336,11 +415,13 @@ export function useActions(options: {
       ref: string,
       inputs: Record<string, string>,
     ): Promise<boolean> => {
-      return withMutation('disparar workflow', () =>
+      const ok = await withMutation('disparar workflow', () =>
         dispatchWorkflow(token, repoFullName, workflowId, ref, inputs),
       )
+      if (ok) schedulePostDispatchRefresh()
+      return ok
     },
-    [token, withMutation],
+    [token, withMutation, schedulePostDispatchRefresh],
   )
 
   return {
